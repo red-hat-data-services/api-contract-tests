@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rhoai.io/schemas/contract-set.schema.json",
+  "title": "ContractSet",
+  "description": "A provider-owned descriptor registering one or more compatibility contracts. Points at local sources; never copies them. See docs/onboarding/openapi-compat.md.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "const": "contracts.rhoai.io/v1alpha1" },
+    "kind": { "const": "ContractSet" },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["contracts"],
+      "properties": {
+        "candidate": {
+          "type": "object",
+          "description": "Default generator for contracts in this set that do not declare their own.",
+          "properties": { "generator": { "$ref": "#/$defs/generator" } }
+        },
+        "contracts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/contract" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "generator": {
+      "type": "object",
+      "required": ["adapter"],
+      "description": "Names a reviewed, registered adapter (see modules/openapi-compat/adapters.py); an unregistered name fails closed rather than running arbitrary logic.",
+      "properties": {
+        "adapter": {
+          "type": "string",
+          "enum": ["openapi.bundle.yq-merge", "openapi.static"]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "adapter": { "const": "openapi.bundle.yq-merge" } } },
+          "then": {
+            "required": ["script", "sourceDir", "sourceGlobs", "entrypointArg", "output"],
+            "properties": {
+              "script": { "type": "string", "description": "Repo-relative path to the provider's bundling script" },
+              "yqEnvVar": { "type": "string", "default": "YQ" },
+              "sourceDir": { "type": "string" },
+              "sourceGlobs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+              "entrypointArg": { "type": "string" },
+              "output": { "type": "string", "description": "Repo-relative path the bundler writes, copied out as the candidate" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "adapter": { "const": "openapi.static" } } },
+          "then": {
+            "required": ["source"],
+            "properties": {
+              "source": { "type": "string", "description": "Repo-relative path to the already-bundled, contract-first OpenAPI document" }
+            }
+          }
+        }
+      ]
+    },
+    "contract": {
+      "type": "object",
+      "required": ["id", "type", "declaredArtifact", "policy"],
+      "properties": {
+        "id": { "type": "string", "description": "Stable contract id, unique within this descriptor" },
+        "type": { "const": "openapi", "description": "Only 'openapi' is implemented by this module; protobuf/CRD are follow-on work" },
+        "declaredArtifact": { "type": "string", "description": "Repo-relative path to the committed, generated contract" },
+        "matchPath": {
+          "type": "string",
+          "description": "Regular expression scoping comparisons to this contract's operations within the declared artifact; omit to cover the whole document",
+          "default": ".*"
+        },
+        "generator": { "$ref": "#/$defs/generator" },
+        "policy": {
+          "type": "object",
+          "required": ["oasdiffVersion", "yqVersion"],
+          "properties": {
+            "oasdiffVersion": { "type": "string", "description": "Exact pinned oasdiff version; verified against the binary's embedded Go module version, not just --version" },
+            "yqVersion": { "type": "string", "description": "Exact pinned mikefarah/yq version; verified before descriptor parsing and candidate generation" },
+            "flattenAllOf": { "type": "boolean", "default": true },
+            "severityOverrides": {
+              "type": "object",
+              "description": "Maps an oasdiff rule id (see `oasdiff checks changelog`) to an overridden severity",
+              "additionalProperties": { "enum": ["info", "warn", "error"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

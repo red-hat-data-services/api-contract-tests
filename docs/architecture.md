@@ -1,0 +1,42 @@
+# Contract-tests architecture
+
+## Purpose
+
+`contract-tests` provides shared, reproducible compatibility checks that run in
+provider pull-request CI. It does not become a second source of truth for
+provider contracts.
+
+## Ownership
+
+| Responsibility | Owner |
+|---|---|
+| Canonical OpenAPI document, CRD, or protobuf source | Provider repository |
+| Provider behavior and upgrade tests | Provider team |
+| Consumer reliance profile | Consumer repository |
+| Shared compatibility policy, schemas, runner, and workflows | `contract-tests` |
+| Supported release matrix | Productization |
+
+## Provider pull-request flow
+
+1. Check out the provider pull request.
+2. Generate a fresh candidate contract using a registered adapter and pinned tools.
+3. Require rolling and supported-release baselines as full Git SHAs.
+4. Verify baseline artifact digests.
+5. Run the compatibility check and consumer-profile verification.
+6. Publish a machine-readable report with candidate, baseline, policy, and tool provenance.
+7. Advance the rolling baseline only after merge through a trusted workflow.
+
+## Enforcement modes
+
+- **Report-only:** compatibility findings are recorded but do not fail the pull request.
+- **Enforce:** breaking findings fail the pull request.
+
+Infrastructure and integrity failures fail closed in both modes. Missing
+baselines, digest mismatches, mutable baseline refs, malformed descriptors,
+unpinned tools, and missing required results must not produce a silent pass.
+
+## Current and follow-on contract types
+
+- OpenAPI compatibility is implemented.
+- CRD compatibility is being researched.
+- Protobuf and additional contract types are follow-on work.

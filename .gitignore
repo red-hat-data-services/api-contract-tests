@@ -1,0 +1,10 @@
+.DS_Store
+*.swp
+*.tmp
+*~
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+bin/
+.contract-report/

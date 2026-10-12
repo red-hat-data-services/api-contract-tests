@@ -1,0 +1,110 @@
+name: Provider OpenAPI compatibility check
+
+on:
+  workflow_call:
+    inputs:
+      contract-set:
+        description: ContractSet path, relative to the provider repository root
+        required: true
+        type: string
+      contract-id:
+        description: Contract id; omit when the descriptor registers exactly one contract
+        required: false
+        type: string
+      mode:
+        description: report or enforce
+        required: false
+        type: string
+        default: report
+      baseline-refs:
+        description: Space-separated full Git SHAs
+        required: true
+        type: string
+      oasdiff-version:
+        description: Exact oasdiff version declared by the provider descriptor
+        required: true
+        type: string
+      yq-version:
+        description: Exact mikefarah/yq version declared by the provider descriptor
+        required: true
+        type: string
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out provider repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Require a pinned reusable-workflow ref
+        env:
+          TOOL_REF: ${{ github.action_ref }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TOOL_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Call this workflow by a full commit SHA, not a branch or tag: $TOOL_REF" >&2
+            exit 2
+          fi
+
+      - name: Check out contract-tests
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: red-hat-data-services/contract-tests
+          ref: ${{ github.action_ref }}
+          path: .contract-tests
+
+      - name: Set up Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: "1.26"
+
+      - name: Install pinned tools
+        env:
+          OASDIFF_VERSION: ${{ inputs.oasdiff-version }}
+          YQ_VERSION: ${{ inputs.yq-version }}
+        run: |
+          set -euo pipefail
+          version_pattern='^[0-9]+\.[0-9]+\.[0-9]+$'
+          [[ "$OASDIFF_VERSION" =~ $version_pattern ]] || { echo "Invalid oasdiff version" >&2; exit 2; }
+          [[ "$YQ_VERSION" =~ $version_pattern ]] || { echo "Invalid yq version" >&2; exit 2; }
+          GOBIN="$PWD/bin" go install "github.com/oasdiff/oasdiff@v$OASDIFF_VERSION"
+          GOBIN="$PWD/bin" go install "github.com/mikefarah/yq/v4@v$YQ_VERSION"
+
+      - name: Run compatibility check
+        env:
+          CONTRACT_SET: ${{ inputs.contract-set }}
+          CONTRACT_ID: ${{ inputs.contract-id }}
+          MODE: ${{ inputs.mode }}
+          BASELINE_REFS: ${{ inputs.baseline-refs }}
+          OASDIFF: ${{ github.workspace }}/bin/oasdiff
+          YQ: ${{ github.workspace }}/bin/yq
+        run: |
+          set -euo pipefail
+          [[ "$MODE" == "report" || "$MODE" == "enforce" ]] || { echo "mode must be report or enforce" >&2; exit 2; }
+          read -r -a refs <<< "$BASELINE_REFS"
+          args=(--repo "$PWD" --contract-set "$CONTRACT_SET" --output-dir "$PWD/.contract-report")
+          if [[ -n "$CONTRACT_ID" ]]; then
+            args+=(--contract-id "$CONTRACT_ID")
+          fi
+          for ref in "${refs[@]}"; do
+            if [[ ! "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Baseline refs must be full 40-character Git SHAs: $ref" >&2
+              exit 2
+            fi
+            args+=(--baseline-ref "$ref")
+          done
+          if [[ "$MODE" == "enforce" ]]; then
+            args+=(--enforce)
+          fi
+          python3 .contract-tests/cmd/contract-tests/cli.py check "${args[@]}"
+
+      - name: Archive report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: contract-report
+          path: .contract-report
