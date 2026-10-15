@@ -102,9 +102,67 @@ jobs:
           fi
           python3 .contract-tests/cmd/contract-tests/cli.py check "${args[@]}"
 
+      - name: Summarize compatibility result
+        if: always()
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report_path = Path(".contract-report/report.json")
+          if not report_path.is_file():
+              print("::error::Compatibility check did not produce report.json")
+              raise SystemExit(1)
+
+          report = json.loads(report_path.read_text())
+          label = report.get("contract_id", report.get("contract_set", "unknown contract"))
+          mode = report.get("mode", "unknown mode")
+          status = report.get("status", "error")
+          baselines = report.get("baselines", [])
+          finding_count = sum(len(baseline.get("findings", [])) for baseline in baselines)
+
+          print(f"## OpenAPI compatibility: {label}")
+          print()
+          print(f"- **Mode:** {mode}")
+          print(f"- **Result:** {status}")
+          print(f"- **Findings:** {finding_count}")
+          print()
+          print("| Baseline | Compatible | Findings |")
+          print("| --- | --- | --- |")
+          for baseline in baselines:
+              compatible = "yes" if baseline.get("compatible") else "no"
+              baseline_findings = len(baseline.get("findings", []))
+              print(f"| `{baseline.get('sha', 'unknown')}` | {compatible} | {baseline_findings} |")
+
+          if status == "breaking":
+              message = f"{label}: {status} ({mode}); {finding_count} breaking findings. Download the contract-report artifact for details."
+              if mode == "report-only":
+                  print(f"::warning::{message}")
+              else:
+                  print(f"::error::{message}")
+
+              print()
+              print("### Breaking findings")
+              print()
+              for baseline in baselines:
+                  for finding in baseline.get("findings", []):
+                      text = finding.get("text", "").replace("|", "\\|")
+                      path = finding.get("path", "")
+                      operation = finding.get("operation", "")
+                      print(f"- `{operation} {path}` — {text}")
+          elif status == "error":
+              errors = "; ".join(report.get("errors", [])) or "unknown error"
+              print(f"::error::{label}: {status} ({mode}); {errors}")
+          else:
+              print(f"::notice::{label}: {status} ({mode}); {finding_count} findings.")
+          PY
+
       - name: Archive report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: contract-report
           path: .contract-report
+          include-hidden-files: true
