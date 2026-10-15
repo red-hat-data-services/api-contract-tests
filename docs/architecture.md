@@ -38,5 +38,6 @@ unpinned tools, and missing required results must not produce a silent pass.
 ## Current and follow-on contract types
 
 - OpenAPI compatibility is implemented.
-- CRD compatibility is being researched.
+- Static CRD compatibility is implemented.
+- CRD conversion, stored-object migration, and consumer-reliance checks are follow-on work.
 - Protobuf and additional contract types are follow-on work.
