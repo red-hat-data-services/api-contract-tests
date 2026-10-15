@@ -11,9 +11,10 @@ this repository supplies the shared checks and result format.
 ## Current status
 
 - The OpenAPI compatibility module is implemented and tested.
+- The initial static CRD compatibility module is implemented and tested.
 - The local runner is `cmd/contract-tests/cli.py`.
 - The reusable provider workflow is drafted but not yet wired into a live provider repository.
-- CRD compatibility research is underway; no CRD check is implemented yet.
+- CRD conversion, stored-object migration, and consumer-reliance checks are follow-on work.
 
 ## Quick start
 
@@ -35,12 +36,26 @@ Every check pins `oasdiff` and `yq` in the provider descriptor and resolves
 each baseline to a full Git SHA. Mutable refs such as `main`, `HEAD`, tags,
 and branches are rejected.
 
+For a provider with committed CRD manifests:
+
+```bash
+python3 /path/to/contract-tests/cmd/contract-tests/cli.py crd-check \
+  --repo . \
+  --crd-glob 'config/crd/**/*.yaml' \
+  --baseline-ref <full-git-sha> \
+  --output-dir /tmp/crd-contract-report
+```
+
+See [CRD onboarding](docs/onboarding/crd-compat.md) for the initial static
+policy and the remaining cluster-backed follow-on work.
+
 ## Repository layout
 
 ```text
 .
 ├── cmd/contract-tests/       # Local runner
 ├── modules/openapi-compat/   # OpenAPI compatibility engine
+├── modules/crd-compat/       # Static CRD compatibility engine
 ├── schemas/                  # ContractSet descriptor schema
 ├── docs/
 │   ├── architecture.md       # Ownership and enforcement model
@@ -59,7 +74,7 @@ and branches are rejected.
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
-OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests -v
+OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests -v
 ```
 
 The test suite requires `oasdiff` v1.33.0 and `yq` v4.45.1:

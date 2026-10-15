@@ -40,4 +40,4 @@ jobs:
           YQ: ${{ github.workspace }}/bin/yq
         run: |
           python3 -m compileall cmd modules
-          python3 -m pytest modules/openapi-compat/tests -v
+          python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests -v
