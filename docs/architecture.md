@@ -1,8 +1,8 @@
-# Contract-tests architecture
+# api-contract-tests architecture
 
 ## Purpose
 
-`contract-tests` provides shared, reproducible compatibility checks that run in
+`api-contract-tests` provides shared, reproducible compatibility checks that run in
 provider pull-request CI. It does not become a second source of truth for
 provider contracts.
 
@@ -13,7 +13,7 @@ provider contracts.
 | Canonical OpenAPI document, CRD, or protobuf source | Provider repository |
 | Provider behavior and upgrade tests | Provider team |
 | Consumer reliance profile | Consumer repository |
-| Shared compatibility policy, schemas, runner, and workflows | `contract-tests` |
+| Shared compatibility policy, schemas, runner, and workflows | `api-contract-tests` |
 | Supported release matrix | Productization |
 
 ## Provider pull-request flow
@@ -23,8 +23,9 @@ provider contracts.
 3. Require rolling and supported-release baselines as full Git SHAs.
 4. Verify baseline artifact digests.
 5. Run the compatibility check and consumer-profile verification.
-6. Publish a machine-readable report with candidate, baseline, policy, and tool provenance.
-7. Advance the rolling baseline only after merge through a trusted workflow.
+6. Confirm the descriptor accounts for every OpenAPI document and CRD in the repository (the coverage check), so a new spec cannot stay outside the gate unnoticed.
+7. Publish a machine-readable report with candidate, baseline, policy, and tool provenance.
+8. Advance the rolling baseline only after merge through a trusted workflow.
 
 ## Enforcement modes
 

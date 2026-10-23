@@ -28,6 +28,18 @@
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/contract" }
+        },
+        "exclusions": {
+          "type": "array",
+          "description": "OpenAPI documents in this repository that are deliberately not contracts (for example an internal UI API). Read by the coverage check; a document that is neither a contract, a generator input, nor listed here is reported as uncovered.",
+          "items": {
+            "type": "object",
+            "required": ["path", "reason"],
+            "properties": {
+              "path": { "type": "string", "description": "Repo-relative path or glob; '*' also matches '/'" },
+              "reason": { "type": "string", "minLength": 1, "description": "Why this document is outside the contract set; reviewers read this" }
+            }
+          }
         }
       }
     }

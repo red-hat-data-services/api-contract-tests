@@ -1,7 +1,8 @@
 # contract-tests local runner
 
-A thin CLI over the [`openapi-compat`](../../modules/openapi-compat/) and
-[`crd-compat`](../../modules/crd-compat/) modules.
+A thin CLI over the [`openapi-compat`](../../modules/openapi-compat/),
+[`crd-compat`](../../modules/crd-compat/), and
+[`coverage`](../../modules/coverage/) modules.
 
 ```bash
 python3 cmd/contract-tests/cli.py check \
@@ -28,4 +29,21 @@ python3 cmd/contract-tests/cli.py crd-check \
 ```
 
 See [`docs/onboarding/crd-compat.md`](../../docs/onboarding/crd-compat.md).
+Coverage and discovery:
+
+```bash
+# Fail if an OpenAPI document (or, with --crd-glob, a CRD) is not registered.
+python3 cmd/contract-tests/cli.py coverage \
+  --repo /path/to/provider/checkout \
+  [--contract-set .rhoai/contracts.yaml] [--crd-glob 'config/crd/**/*.yaml'] \
+  [--format text|json] [--report-only] [--yq <path>]
+
+# Inventory a repository and suggest contract shapes; needs no descriptor.
+python3 cmd/contract-tests/cli.py discover --repo /path/to/provider/checkout [--format text|json]
+```
+
+`coverage` exits 0 when everything is accounted for, 1 when it finds gaps (0 with
+`--report-only`), and 2 on an integrity error such as an unparseable descriptor,
+an exclusion without a reason, or an unpinned `yq`.
+
 `protobuf-compat` and additional contract types are follow-on work.

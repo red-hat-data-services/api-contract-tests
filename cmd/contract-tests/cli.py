@@ -2,8 +2,9 @@
 """contract-tests: local runner for shared RHOAI and ODH contract checks.
 
 This repository is the shared-tooling home. The runner currently wraps the
-OpenAPI and static CRD compatibility modules; conversion and upgrade testing
-remain follow-on work.
+OpenAPI and static CRD compatibility modules and a coverage check that
+confirms every API contract in a repository is registered; conversion and
+upgrade testing remain follow-on work.
 
 The same invocation runs locally and in CI, so results are reproducible
 without a cluster:
@@ -23,6 +24,7 @@ from pathlib import Path
 
 _CHECKER_PATH = Path(__file__).resolve().parents[2] / "modules" / "openapi-compat" / "checker.py"
 _CRD_CHECKER_PATH = Path(__file__).resolve().parents[2] / "modules" / "crd-compat" / "checker.py"
+_COVERAGE_PATH = Path(__file__).resolve().parents[2] / "modules" / "coverage" / "checker.py"
 
 
 def _load_checker():
@@ -34,6 +36,13 @@ def _load_checker():
 
 def _load_crd_checker():
     spec = importlib.util.spec_from_file_location("crd_compat_checker", _CRD_CHECKER_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_coverage():
+    spec = importlib.util.spec_from_file_location("coverage_checker", _COVERAGE_PATH)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -66,7 +75,36 @@ def main(argv=None):
                            help="New report directory; existing paths are never overwritten")
     crd_check.add_argument("--enforce", action="store_true", help="Exit 1 for breaking changes; default is report-only")
 
+    coverage = subparsers.add_parser(
+        "coverage",
+        help="Confirm every OpenAPI document (and optionally CRD) in the repository is registered",
+    )
+    coverage.add_argument("--repo", type=Path, required=True, help="Path to the provider repository to check")
+    coverage.add_argument("--contract-set", type=Path, default=Path(".rhoai/contracts.yaml"),
+                          help="Path to the ContractSet descriptor, relative to --repo (default .rhoai/contracts.yaml)")
+    coverage.add_argument("--crd-glob", action="append", default=[],
+                          help="Repository-relative glob used by the CRD check; repeat to cover several. "
+                               "When given, every CRD manifest must match one of them")
+    coverage.add_argument("--crd-exclude", action="append", default=[],
+                          help="Repository-relative glob of CRD manifests that are deliberately not checked "
+                               "(for example mocked CRDs used as test data); repeat as needed")
+    coverage.add_argument("--format", choices=("text", "json"), default="text")
+    coverage.add_argument("--report-only", action="store_true",
+                          help="Exit 0 even when gaps are found; integrity errors still exit 2")
+    coverage.add_argument("--yq", default=os.environ.get("YQ"), help="Repository's pinned yq executable")
+
+    discover = subparsers.add_parser(
+        "discover", help="Inventory the OpenAPI documents and CRDs in a repository and suggest contract shapes",
+    )
+    discover.add_argument("--repo", type=Path, required=True, help="Path to the repository to inventory")
+    discover.add_argument("--format", choices=("text", "json"), default="text")
+    discover.add_argument("--yq", default=os.environ.get("YQ"), help="Pinned yq executable")
+
     args = parser.parse_args(argv)
+    if args.command == "coverage":
+        return _load_coverage().run_coverage(args)
+    if args.command == "discover":
+        return _load_coverage().run_discover(args)
     if args.command == "check":
         checker = _load_checker()
         return checker.run_check(args)

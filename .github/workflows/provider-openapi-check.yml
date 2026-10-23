@@ -163,6 +163,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: contract-report
+          # One artifact per contract: upload-artifact@v4 rejects duplicate names,
+          # which would fail the second contract of a matrix in the same run.
+          name: contract-report-${{ inputs.contract-id || 'default' }}
           path: .contract-report
           include-hidden-files: true

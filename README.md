@@ -1,9 +1,9 @@
-# contract-tests
+# api-contract-tests
 
 Shared CI contract tests for RHOAI and ODH provider repositories, hosted at
-[`red-hat-data-services/contract-tests`](https://github.com/red-hat-data-services/contract-tests).
+[`red-hat-data-services/api-contract-tests`](https://github.com/red-hat-data-services/api-contract-tests).
 
-`contract-tests` is the canonical home for the reusable compatibility runner,
+`api-contract-tests` is the canonical home for the reusable compatibility runner,
 descriptor schemas, provider workflows, and onboarding guides. Provider
 repositories keep their canonical OpenAPI documents, CRDs, and behavior tests;
 this repository supplies the shared checks and result format.
@@ -12,8 +12,12 @@ this repository supplies the shared checks and result format.
 
 - The OpenAPI compatibility module is implemented and tested.
 - The initial static CRD compatibility module is implemented and tested.
+- The coverage check (`coverage`) confirms every OpenAPI document and CRD in a
+  repository is registered; `discover` inventories a repository for onboarding.
 - The local runner is `cmd/contract-tests/cli.py`.
-- The reusable provider workflow is drafted but not yet wired into a live provider repository.
+- Provider onboarding is opt-in and starts in report mode; see
+  [`docs/onboarding`](docs/onboarding/README.md). Check each provider
+  repository's workflow for whether it has been wired in yet.
 - CRD conversion, stored-object migration, and consumer-reliance checks are follow-on work.
 
 ## Quick start
@@ -36,6 +40,16 @@ Every check pins `oasdiff` and `yq` in the provider descriptor and resolves
 each baseline to a full Git SHA. Mutable refs such as `main`, `HEAD`, tags,
 and branches are rejected.
 
+Before relying on the check, confirm every OpenAPI document in the repository
+is registered (or excluded with a reason):
+
+```bash
+python3 /path/to/api-contract-tests/cmd/contract-tests/cli.py coverage --repo .
+```
+
+New to the repository? `discover --repo .` inventories its OpenAPI documents
+and CRDs and suggests a contract for each.
+
 For a provider with committed CRD manifests:
 
 ```bash
@@ -56,10 +70,12 @@ policy and the remaining cluster-backed follow-on work.
 ├── cmd/contract-tests/       # Local runner
 ├── modules/openapi-compat/   # OpenAPI compatibility engine
 ├── modules/crd-compat/       # Static CRD compatibility engine
+├── modules/coverage/         # Coverage check and repository discovery
 ├── schemas/                  # ContractSet descriptor schema
+├── .claude/skills/           # Assistant skill that walks an onboarding
 ├── docs/
 │   ├── architecture.md       # Ownership and enforcement model
-│   ├── onboarding/           # Provider onboarding guides
+│   ├── onboarding/           # Provider onboarding checklist and guides
 │   └── research/             # CRD and follow-on research
 └── .github/workflows/        # CI and provider workflows
 ```
@@ -74,7 +90,7 @@ policy and the remaining cluster-backed follow-on work.
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
-OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests -v
+OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests -v
 ```
 
 The test suite requires `oasdiff` v1.33.0 and `yq` v4.45.1:
