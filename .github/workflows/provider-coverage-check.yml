@@ -1,0 +1,122 @@
+name: Provider contract coverage check
+
+# Fails when an OpenAPI document (or, with crd-globs, a CustomResourceDefinition)
+# in the provider repository is not registered in its ContractSet descriptor.
+# Run it next to the compatibility checks so a newly added spec cannot silently
+# stay outside the gate.
+
+on:
+  workflow_call:
+    inputs:
+      contract-set:
+        description: ContractSet path, relative to the provider repository root
+        required: false
+        type: string
+        default: .rhoai/contracts.yaml
+      crd-globs:
+        description: Space-separated CRD globs used by the provider CRD check; leave empty to skip CRD coverage
+        required: false
+        type: string
+        default: ""
+      crd-exclude-globs:
+        description: Space-separated globs of CRD manifests deliberately not checked (for example mocked test CRDs)
+        required: false
+        type: string
+        default: ""
+      baseline-refs:
+        description: >-
+          Space-separated full Git SHAs; the repository default baseline. Optional. Used only to
+          flag per-contract baselines that are newer than, narrower than, or diverge from the default.
+        required: false
+        type: string
+        default: ""
+      mode:
+        description: report (never fails on gaps) or enforce
+        required: false
+        type: string
+        default: report
+      yq-version:
+        description: Exact mikefarah/yq version declared by the provider descriptor
+        required: true
+        type: string
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out provider repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Full history: comparing a per-contract baseline with the default needs the commits.
+          fetch-depth: 0
+
+      - name: Require a pinned reusable-workflow ref
+        env:
+          WORKFLOW_REF: ${{ job.workflow_ref }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          # job.workflow_sha is always the resolved commit, even when the caller wrote a
+          # branch or tag, so it cannot show how the caller pinned. job.workflow_ref ends
+          # with the ref the caller wrote after '@'; require a full commit SHA there.
+          pinned="${WORKFLOW_REF##*@}"
+          if [[ ! "$pinned" =~ ^[0-9a-f]{40}$ || "$pinned" != "$WORKFLOW_SHA" ]]; then
+            echo "::error::Call this workflow by a full commit SHA, not a branch or tag: $WORKFLOW_REF"
+            exit 2
+          fi
+
+      - name: Check out api-contract-tests
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .contract-tests
+
+      - name: Set up Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: "1.26"
+
+      - name: Install pinned yq
+        env:
+          YQ_VERSION: ${{ inputs.yq-version }}
+        run: |
+          set -euo pipefail
+          [[ "$YQ_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid yq version" >&2; exit 2; }
+          GOBIN="$PWD/bin" go install "github.com/mikefarah/yq/v4@v$YQ_VERSION"
+
+      - name: Check contract coverage
+        env:
+          CONTRACT_SET: ${{ inputs.contract-set }}
+          CRD_GLOBS: ${{ inputs.crd-globs }}
+          CRD_EXCLUDE_GLOBS: ${{ inputs.crd-exclude-globs }}
+          BASELINE_REFS: ${{ inputs.baseline-refs }}
+          MODE: ${{ inputs.mode }}
+          YQ: ${{ github.workspace }}/bin/yq
+        run: |
+          set -euo pipefail
+          [[ "$MODE" == "report" || "$MODE" == "enforce" ]] || { echo "mode must be report or enforce" >&2; exit 2; }
+          args=(--repo "$PWD" --contract-set "$CONTRACT_SET")
+          # Globs are expanded by the checker, never by the shell.
+          set -f
+          for glob in $CRD_GLOBS; do
+            args+=(--crd-glob "$glob")
+          done
+          for glob in $CRD_EXCLUDE_GLOBS; do
+            args+=(--crd-exclude "$glob")
+          done
+          set +f
+          read -r -a refs <<< "$BASELINE_REFS"
+          for ref in "${refs[@]}"; do
+            if [[ ! "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Baseline refs must be full 40-character Git SHAs: $ref" >&2
+              exit 2
+            fi
+            args+=(--baseline-ref "$ref")
+          done
+          if [[ "$MODE" == "report" ]]; then
+            args+=(--report-only)
+          fi
+          python3 .contract-tests/cmd/contract-tests/cli.py coverage "${args[@]}" | tee "$GITHUB_STEP_SUMMARY"

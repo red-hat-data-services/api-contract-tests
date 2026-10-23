@@ -1,5 +1,8 @@
 # Onboarding a provider to the CRD compatibility check
 
+See the [onboarding checklist](README.md) for the whole path. This guide is the
+detail for the CRD check.
+
 The CRD check compares CustomResourceDefinition YAML files in a provider pull
 request against immutable Git baselines. It initially detects:
 
@@ -20,7 +23,7 @@ Reference the workflow by a full commit SHA:
 ```yaml
 jobs:
   crd-contract:
-    uses: red-hat-data-services/contract-tests/.github/workflows/provider-crd-check.yml@<full-git-sha>
+    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-crd-check.yml@<full-git-sha>
     with:
       crd-glob: config/crd/**/*.yaml
       baseline-refs: <full-git-sha>
@@ -34,7 +37,7 @@ provider and consumers agree on the policy.
 
 ```bash
 baseline_sha=$(git rev-parse refs/remotes/origin/main)
-python3 <path-to-red-hat-data-services/contract-tests>/cmd/contract-tests/cli.py crd-check \
+python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/contract-tests/cli.py crd-check \
   --repo . \
   --crd-glob 'config/crd/**/*.yaml' \
   --baseline-ref "$baseline_sha" \
@@ -43,6 +46,36 @@ python3 <path-to-red-hat-data-services/contract-tests>/cmd/contract-tests/cli.py
 
 Baselines must be full Git SHAs. Mutable refs such as `main`, tags, and branches
 are rejected.
+
+## New CRDs
+
+A CRD that exists in the pull request but not in the baseline is new and is not
+compared. When the baseline has no CRD manifests at all, the check reports
+`status: new` and does not fail. If the baseline has CRD manifests but none match
+your glob, that is a configuration error and still fails.
+
+## Confirm every CRD is covered
+
+The glob decides which manifests are compared, so a CRD that moves or is added
+outside it silently leaves the check. Run the coverage check with the same
+glob:
+
+```bash
+python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/contract-tests/cli.py coverage \
+  --repo . --contract-set .rhoai/contracts.yaml --crd-glob 'config/crd/**/*.yaml'
+```
+
+Every CRD manifest must match a `--crd-glob` (repeat the flag when you use
+several), and every glob must match at least one manifest. Kustomize patches
+that merely say `kind: CustomResourceDefinition` (conversion-webhook or
+CA-injection patches) are not CRD manifests and are ignored. CRDs that are
+deliberately not checked, such as mocked CRDs used as test data, are named with
+`--crd-exclude <glob>`; keep the reason in a comment next to the workflow
+input so reviewers can read it.
+
+A repository that ships only CRDs has no descriptor. In that case `coverage`
+runs in CRD-only mode: pass `--crd-glob` and it checks just the CRD globs. If
+the repository also has OpenAPI documents, it needs a descriptor as usual.
 
 ## Follow-on work
 

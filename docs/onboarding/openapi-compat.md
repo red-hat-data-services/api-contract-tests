@@ -1,5 +1,9 @@
 # Onboarding a provider to the openapi-compat check
 
+Start with the [onboarding checklist](README.md) for the whole path (inventory,
+descriptor, local run, coverage, CI, code owners). This guide is the detail for
+the OpenAPI check itself.
+
 This generalizes the Model Catalog pilot's original checker into a reusable
 module so a second provider never needs to copy or reimplement its logic. The
 initial implementation came from the
@@ -69,6 +73,32 @@ severity — for example, if consumers rely on an *optional* response field,
 its removal defaults to `info` in oasdiff but can be promoted to `warn` so
 it surfaces as a finding.
 
+### Several contracts in one repository
+
+A descriptor can register more than one contract, for example one per API
+version. Give each a stable `id` and its own `matchPath`; the runner and the
+reusable workflow check one contract at a time (`--contract-id`), so call the
+workflow once per contract (see [step 5](#5-add-ci)).
+
+### Documents that are not contracts
+
+Every OpenAPI document in the repository must be accounted for. If one is
+deliberately outside the contract set (an internal UI API, a test fixture),
+list it with a reason instead of leaving it unmentioned:
+
+```yaml
+spec:
+  exclusions:
+    - path: clients/ui/bff/openapi/*
+      reason: Internal UI back-end-for-front-end API, not a provider contract
+  contracts:
+    - ...
+```
+
+`path` is a repo-relative path or glob (`*` also matches `/`). An exclusion
+without a `reason` is rejected. The [coverage check](#confirm-nothing-is-left-out)
+reads this list.
+
 ## 3. Install the pinned tools
 
 ```sh
@@ -83,7 +113,7 @@ builds that print `main`, it checks the binary's embedded Go module version.
 
 ```bash
 baseline_sha=$(git rev-parse refs/remotes/<trusted-remote>/main)
-python3 <path-to-red-hat-data-services/contract-tests>/cmd/contract-tests/cli.py check \
+python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/contract-tests/cli.py check \
   --repo . \
   --contract-set .rhoai/contracts.yaml \
   --baseline-ref "$baseline_sha" \
@@ -98,25 +128,107 @@ once report-only evidence and owner agreement support gating merges.
 Read `report.json.status`, not just the exit code: report-only mode exits
 `0` even when breaking findings are recorded.
 
-## 5. Add CI
+### Baselines
 
-Call the reusable workflow from a provider workflow. Always reference it by a
-full commit SHA; never call it by `main` or a tag:
+`--baseline-ref` (or the workflow's `baseline-refs`) is the repository default.
+A contract can override it with its own `baseline` block (`refs`, a mandatory
+`reason`, and optionally `artifact` when the file was later moved), and the
+descriptor can carry the default as `spec.baseline.refs` instead. Precedence is
+the contract's `baseline`, then `--baseline-ref`, then `spec.baseline.refs`.
 
-```yaml
-jobs:
-  api-contract:
-    uses: red-hat-data-services/contract-tests/.github/workflows/provider-openapi-check.yml@<full-git-sha>
-    with:
-      contract-set: .rhoai/contracts.yaml
-      baseline-refs: <full-git-sha>
-      oasdiff-version: "1.33.0"
-      yq-version: "4.45.1"
+- **New APIs are not failures.** If the declared artifact does not exist at a
+  default baseline, the contract is reported with `status: new` for that baseline
+  and nothing is compared. If every baseline predates the API, `report.json.status`
+  is `new`, which is neither a pass on compatibility nor a failure. The candidate
+  is still generated, checked for staleness and validated.
+- **A contract's own baseline is a promise.** The artifact must exist there, or
+  the check fails.
+- **Moves are not silently "new".** If the artifact is absent but another OpenAPI
+  document at that baseline already serves the contract's `matchPath` paths, the
+  check fails and names it; set `baseline.artifact` to compare across the rename.
+  A catch-all `matchPath` (omitted or `.*`) cannot tell one API from another, so it
+  fails closed: if the artifact is absent and any other OpenAPI document exists at
+  the baseline, the check errors instead of granting the "new" exemption. Set a
+  specific `matchPath`, or `baseline.artifact` if the file was renamed.
+- **Wrong versions still fail.** A baseline that has the file but no paths under
+  `matchPath` is an error.
+
+See the [checklist](README.md#choosing-a-baseline) for when to use an override.
+
+### Confirm nothing is left out
+
+```bash
+python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/contract-tests/cli.py coverage \
+  --repo . --contract-set .rhoai/contracts.yaml
 ```
 
-The workflow validates its own reusable-workflow ref, installs exact tool
-versions, and rejects mutable baseline refs. Until it has been exercised in a
-live provider, run the local command above in a provider-local job.
+The check finds every OpenAPI document tracked in the repository (plus
+untracked files that are not git-ignored, so it works before you commit a new
+spec) and reports each as one of:
+
+| Status | Meaning |
+|---|---|
+| `contract` | The document is a contract's `declaredArtifact` |
+| `source` | The document is an input of a registered generator (`sourceGlobs` or `source`) |
+| `excluded` | Listed in `spec.exclusions`, with the reason shown |
+| `UNCOVERED` | None of the above; the check fails |
+
+It also fails on dangling configuration (a `declaredArtifact` that is not an
+OpenAPI document, a `sourceGlob` that matches nothing) and warns about stale
+exclusions. For each contract it reports how many API paths fall outside
+`matchPath`; that is intentional scoping and never a failure, but it makes the
+scope visible to reviewers. Add `--format json` for machine-readable output,
+`--report-only` to see gaps without failing, and `--crd-glob` (repeatable) to
+require that every CRD manifest is matched by the glob your CRD check uses. Overlapping globs are fine; each pattern only has to match something.
+
+## 5. Add CI
+
+Call the reusable workflows from a provider workflow, for example
+`.github/workflows/api-contract.yml`. Always reference them by a full commit
+SHA; never by `main` or a tag. Start in `report` mode.
+
+```yaml
+name: API contract
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  api-contract:
+    strategy:
+      fail-fast: false
+      matrix:
+        contract-id: [your-service-v1, your-service-v1alpha3]
+    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-openapi-check.yml@<full-git-sha>
+    with:
+      contract-set: .rhoai/contracts.yaml
+      contract-id: ${{ matrix.contract-id }}
+      baseline-refs: <full-git-sha>   # optional if the descriptor declares baselines
+      oasdiff-version: "1.33.0"
+      yq-version: "4.45.1"
+      mode: report
+
+  api-contract-coverage:
+    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-coverage-check.yml@<full-git-sha>
+    with:
+      contract-set: .rhoai/contracts.yaml
+      baseline-refs: <full-git-sha>   # optional: lets coverage flag per-contract baselines that loosen the default
+      yq-version: "4.45.1"
+      mode: report
+```
+
+Omit `contract-id` and the matrix when the descriptor registers exactly one
+contract. Each contract uploads its own `contract-report-<id>` artifact.
+
+The workflows validate their own reusable-workflow ref, install exact tool
+versions, and reject mutable baseline refs. A change to `baseline-refs`, to the
+pinned workflow SHA, or to the descriptor changes what the check protects, so
+require an owner's review for those files (see the
+[checklist](README.md#checklist), step 7).
 
 ## 6. Register the contract with the working group
 

@@ -147,3 +147,34 @@ class TestCRDCompatChecker:
         assert result.returncode == 2
         assert report["status"] == "error"
         assert "full 40- or 64-character Git SHA" in report["errors"][0]
+
+    def early_commit(self):
+        """A commit from before the provider had CRDs."""
+        tree = self.git("hash-object", "-t", "tree", os.devnull).stdout.strip()
+        return self.git("commit-tree", tree, "-m", "before the CRDs existed").stdout.strip()
+
+    def test_crds_absent_from_the_baseline_are_new_not_a_failure(self):
+        result, report = self.check(baseline=self.early_commit())
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["status"] == "new"
+        assert report["baselines"][0]["status"] == "new"
+
+    def test_new_crd_next_to_existing_ones_is_compatible(self):
+        extra = self.repo / "config/crd/another.yaml"
+        extra.write_text(BASE_CRD.replace("widgets", "gadgets").replace("Widget", "Gadget"), encoding="utf-8")
+        result, report = self.check()
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["status"] == "compatible"
+
+    def test_glob_that_misses_the_baseline_crds_is_still_an_error(self):
+        # The baseline has a CRD, just not where the glob looks: a configuration error.
+        moved = self.repo / "deploy"
+        moved.mkdir()
+        self.git("mv", "config/crd/example.yaml", "deploy/example.yaml")
+        self.commit("move the CRD")
+        elsewhere = self.git("rev-parse", "HEAD").stdout.strip()
+        self.git("mv", "deploy/example.yaml", "config/crd/example.yaml")
+        self.commit("move it back")
+        result, report = self.check(baseline=elsewhere)
+        assert result.returncode == 2
+        assert "glob is probably wrong" in "".join(report["errors"])

@@ -195,6 +195,131 @@ class TestOpenAPICompatChecker:
         assert report["status"] == "breaking"
         assert any(check_id in item["id"] for item in report["baselines"][0]["findings"]), report
 
+    # ---- new APIs, baselines and moved artifacts ------------------------------------
+
+    def early_commit(self):
+        """A commit from before the API existed (empty tree)."""
+        tree = self.git("hash-object", "-t", "tree", os.devnull).stdout.strip()
+        return self.git("commit-tree", tree, "-m", "before the API existed").stdout.strip()
+
+    def moved_commit(self):
+        """A commit where the document lived under another name; HEAD gets it back."""
+        self.git("mv", "api/openapi/service.yaml", "api/openapi/legacy-service.yaml")
+        self.commit("Move the service document")
+        moved = self.git("rev-parse", "HEAD").stdout.strip()
+        self.git("mv", "api/openapi/legacy-service.yaml", "api/openapi/service.yaml")
+        self.commit("Move it back")
+        return moved
+
+    def set_descriptor(self, expression):
+        self.mutate(expression, ".rhoai/contracts.yaml")
+
+    def test_api_absent_at_default_baseline_is_new_not_a_failure(self):
+        early = self.early_commit()
+        result, report, _ = self.check(refs=[early])
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["status"] == "new"
+        entry = report["baselines"][0]
+        assert entry["status"] == "new" and entry["source"] == "default"
+        assert "does not exist at this baseline" in entry["reason"]
+        assert report["candidate"]["validation_findings"] is not None
+
+    def test_new_api_still_fails_on_a_stale_bundle(self):
+        self.mutate('.paths["/svc/v1/items"].get.operationId = "renamed"')
+        result, report, _ = self.check(refs=[self.early_commit()])
+        assert result.returncode == 2
+        assert "Stale committed" in result.stderr
+
+    def test_new_baselines_are_skipped_but_others_are_still_compared(self):
+        early = self.early_commit()
+        self.mutate('del(.paths["/svc/v1/items"])')
+        self.regenerate()
+        result, report, _ = self.check(refs=[early, self.baseline])
+        assert result.returncode == 1, result.stdout + result.stderr
+        assert report["status"] == "breaking"
+        assert [entry["status"] for entry in report["baselines"]] == ["new", "compared"]
+
+    def test_wrong_version_at_baseline_is_still_an_error(self):
+        # The file exists but serves other paths: not "new", a misconfigured baseline.
+        self.mutate('.paths |= with_entries(.key |= sub("/svc/v1", "/svc/v9"))', "api/openapi/service.yaml")
+        self.git("add", "-A")
+        self.commit("Serve another version")
+        result, report, _ = self.check(refs=[self.git("rev-parse", "HEAD").stdout.strip()])
+        assert result.returncode == 2
+        assert "wrong API/version" in result.stderr or "Stale" in result.stderr
+
+    def test_moved_artifact_is_an_error_not_new(self):
+        moved = self.moved_commit()
+        result, report, _ = self.check(refs=[moved])
+        assert result.returncode == 2, result.stdout + result.stderr
+        assert "moved or renamed" in result.stderr
+        assert "api/openapi/legacy-service.yaml" in result.stderr
+
+    def test_catch_all_match_path_fails_closed_when_another_document_exists_at_baseline(self):
+        # Without a specific matchPath the checker cannot tell "renamed" from "new".
+        self.set_descriptor("del(.spec.contracts[0].matchPath)")
+        moved = self.moved_commit()
+        result, report, _ = self.check(refs=[moved])
+        assert result.returncode == 2, result.stdout + result.stderr
+        assert report["status"] == "error"
+        assert "catch-all matchPath" in result.stderr
+        assert "api/openapi/legacy-service.yaml" in result.stderr
+
+    def test_catch_all_match_path_is_new_when_the_baseline_has_no_openapi_documents(self):
+        self.set_descriptor("del(.spec.contracts[0].matchPath)")
+        result, report, _ = self.check(refs=[self.early_commit()])
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["status"] == "new"
+
+    def test_baseline_artifact_override_compares_a_moved_document(self):
+        moved = self.moved_commit()
+        self.set_descriptor(
+            f'.spec.contracts[0].baseline = {{"refs": ["{moved}"], "reason": "document was renamed", '
+            '"artifact": "api/openapi/legacy-service.yaml"}'
+        )
+        result, report, _ = self.check(refs=[])
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["status"] == "compatible"
+        assert report["baselines"][0]["source"] == "contract"
+
+    def test_contract_baseline_overrides_the_default(self):
+        early = self.early_commit()
+        self.set_descriptor(f'.spec.contracts[0].baseline = {{"refs": ["{self.baseline}"], "reason": "scoped exception"}}')
+        result, report, _ = self.check(refs=[early])
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["status"] == "compatible"
+        assert [(e["source"], e["status"]) for e in report["baselines"]] == [("contract", "compared")]
+
+    def test_explicit_contract_baseline_must_contain_the_artifact(self):
+        early = self.early_commit()
+        self.set_descriptor(f'.spec.contracts[0].baseline = {{"refs": ["{early}"], "reason": "should exist there"}}')
+        result, _, _ = self.check(refs=[])
+        assert result.returncode == 2
+        assert "names baseline" in result.stderr and "does not exist there" in result.stderr
+
+    def test_contract_baseline_requires_a_reason(self):
+        self.set_descriptor(f'.spec.contracts[0].baseline = {{"refs": ["{self.baseline}"]}}')
+        result, _, _ = self.check(refs=[])
+        assert result.returncode == 2
+        assert "needs a 'reason'" in result.stderr
+
+    def test_contract_baseline_rejects_mutable_refs(self):
+        self.set_descriptor('.spec.contracts[0].baseline = {"refs": ["main"], "reason": "r"}')
+        result, _, _ = self.check(refs=[])
+        assert result.returncode == 2
+        assert "full 40- or 64-character Git SHA" in result.stderr
+
+    def test_descriptor_default_baseline_used_when_no_ref_is_passed(self):
+        self.set_descriptor(f'.spec.baseline = {{"refs": ["{self.baseline}"]}}')
+        result, report, _ = self.check(refs=[])
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert [(e["source"], e["status"]) for e in report["baselines"]] == [("default", "compared")]
+
+    def test_no_baseline_anywhere_is_an_error(self):
+        result, _, _ = self.check(refs=[])
+        assert result.returncode == 2
+        assert "has no baseline" in result.stderr
+
     def test_unchanged_contract_and_saved_baseline(self):
         before = (self.repo / "api/openapi/service.yaml").read_bytes()
         result, report, output = self.check()

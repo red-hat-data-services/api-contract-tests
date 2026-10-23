@@ -70,13 +70,30 @@ def candidate_files(repo, pattern):
 
 def baseline_files(repo, ref, pattern):
     result = command(["git", "ls-tree", "-r", "--name-only", ref], cwd=repo)
-    files = sorted(
+    return sorted(
         Path(line) for line in result.stdout.splitlines()
         if line and fnmatch.fnmatch(line, pattern)
     )
-    if not files:
-        raise CheckError(f"No baseline files match CRD glob {pattern!r} at {ref}")
-    return files
+
+
+def baseline_has_crds(repo, ref):
+    """True when the baseline contains any CRD manifest, wherever it lives.
+
+    Separates "this provider had no CRDs yet" (new, nothing to compare) from "the
+    glob no longer matches the CRDs the baseline has" (a configuration error).
+    """
+    result = command(
+        ["git", "--no-replace-objects", "grep", "-l", "-I", "-E", r"^kind[[:space:]]*:[[:space:]]*CustomResourceDefinition",
+         ref, "--", "*.yaml", "*.yml"],
+        cwd=repo, check=False,
+    )
+    prefix = f"{ref}:"
+    for line in result.stdout.splitlines():
+        relative = line[len(prefix):] if line.startswith(prefix) else line
+        content = command(["git", "show", f"{ref}:{relative}"], cwd=repo, check=False).stdout
+        if re.search(r"^\s+group\s*:\s*\S", content, re.MULTILINE) and re.search(r"^\s+names\s*:", content, re.MULTILINE):
+            return True
+    return False
 
 
 def git_file(repo, ref, relative_path):
@@ -269,6 +286,14 @@ def run_check(args):
         for ref in args.baseline_ref:
             validate_baseline_ref(ref)
             files = baseline_files(args.repo, ref, args.crd_glob)
+            if not files:
+                if baseline_has_crds(args.repo, ref):
+                    raise CheckError(f"No baseline files match CRD glob {args.crd_glob!r} at {ref}, but the baseline has CRD manifests; the glob is probably wrong")
+                report["baselines"].append({
+                    "ref": ref, "sha": resolve_commit(args.repo, ref), "status": "new",
+                    "reason": "the baseline has no CRD manifests; the CRDs are new relative to it, so there is nothing to compare",
+                })
+                continue
             baseline_documents, baseline_records = load_baseline(args.repo, ref, files)
             findings = compare(baseline_documents, candidate_documents)
             compatible = not findings
@@ -276,12 +301,16 @@ def run_check(args):
             report["baselines"].append({
                 "ref": ref,
                 "sha": resolve_commit(args.repo, ref),
+                "status": "compared",
                 "files": baseline_records,
                 "findings": findings,
                 "compatible": compatible,
             })
 
-        report["status"] = "breaking" if breaking else "compatible"
+        if all(baseline["status"] == "new" for baseline in report["baselines"]):
+            report["status"] = "new"
+        else:
+            report["status"] = "breaking" if breaking else "compatible"
         code = 1 if breaking and args.enforce else 0
     except (CheckError, OSError, ValueError) as error:
         report["errors"].append(str(error))
