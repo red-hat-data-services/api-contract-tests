@@ -23,6 +23,13 @@ on:
         required: false
         type: string
         default: ""
+      baseline-refs:
+        description: >-
+          Space-separated full Git SHAs; the repository default baseline. Optional. Used only to
+          flag per-contract baselines that are newer than, narrower than, or diverge from the default.
+        required: false
+        type: string
+        default: ""
       mode:
         description: report (never fails on gaps) or enforce
         required: false
@@ -41,14 +48,22 @@ jobs:
     steps:
       - name: Check out provider repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Full history: comparing a per-contract baseline with the default needs the commits.
+          fetch-depth: 0
 
       - name: Require a pinned reusable-workflow ref
         env:
-          TOOL_REF: ${{ job.workflow_sha }}
+          WORKFLOW_REF: ${{ job.workflow_ref }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
         run: |
           set -euo pipefail
-          if [[ ! "$TOOL_REF" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Call this workflow by a full commit SHA, not a branch or tag: $TOOL_REF" >&2
+          # job.workflow_sha is always the resolved commit, even when the caller wrote a
+          # branch or tag, so it cannot show how the caller pinned. job.workflow_ref ends
+          # with the ref the caller wrote after '@'; require a full commit SHA there.
+          pinned="${WORKFLOW_REF##*@}"
+          if [[ ! "$pinned" =~ ^[0-9a-f]{40}$ || "$pinned" != "$WORKFLOW_SHA" ]]; then
+            echo "::error::Call this workflow by a full commit SHA, not a branch or tag: $WORKFLOW_REF"
             exit 2
           fi
 
@@ -77,6 +92,7 @@ jobs:
           CONTRACT_SET: ${{ inputs.contract-set }}
           CRD_GLOBS: ${{ inputs.crd-globs }}
           CRD_EXCLUDE_GLOBS: ${{ inputs.crd-exclude-globs }}
+          BASELINE_REFS: ${{ inputs.baseline-refs }}
           MODE: ${{ inputs.mode }}
           YQ: ${{ github.workspace }}/bin/yq
         run: |
@@ -92,6 +108,14 @@ jobs:
             args+=(--crd-exclude "$glob")
           done
           set +f
+          read -r -a refs <<< "$BASELINE_REFS"
+          for ref in "${refs[@]}"; do
+            if [[ ! "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Baseline refs must be full 40-character Git SHAs: $ref" >&2
+              exit 2
+            fi
+            args+=(--baseline-ref "$ref")
+          done
           if [[ "$MODE" == "report" ]]; then
             args+=(--report-only)
           fi

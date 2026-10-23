@@ -146,8 +146,10 @@ the contract's `baseline`, then `--baseline-ref`, then `spec.baseline.refs`.
 - **Moves are not silently "new".** If the artifact is absent but another OpenAPI
   document at that baseline already serves the contract's `matchPath` paths, the
   check fails and names it; set `baseline.artifact` to compare across the rename.
-  (A catch-all `matchPath` cannot distinguish APIs, so this guard needs a specific
-  one.)
+  A catch-all `matchPath` (omitted or `.*`) cannot tell one API from another, so it
+  fails closed: if the artifact is absent and any other OpenAPI document exists at
+  the baseline, the check errors instead of granting the "new" exemption. Set a
+  specific `matchPath`, or `baseline.artifact` if the file was renamed.
 - **Wrong versions still fail.** A baseline that has the file but no paths under
   `matchPath` is an error.
 
@@ -177,7 +179,7 @@ exclusions. For each contract it reports how many API paths fall outside
 `matchPath`; that is intentional scoping and never a failure, but it makes the
 scope visible to reviewers. Add `--format json` for machine-readable output,
 `--report-only` to see gaps without failing, and `--crd-glob` (repeatable) to
-require that every CRD manifest is matched by the glob your CRD check uses.
+require that every CRD manifest is matched by the glob your CRD check uses. Overlapping globs are fine; each pattern only has to match something.
 
 ## 5. Add CI
 
@@ -214,6 +216,7 @@ jobs:
     uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-coverage-check.yml@<full-git-sha>
     with:
       contract-set: .rhoai/contracts.yaml
+      baseline-refs: <full-git-sha>   # optional: lets coverage flag per-contract baselines that loosen the default
       yq-version: "4.45.1"
       mode: report
 ```

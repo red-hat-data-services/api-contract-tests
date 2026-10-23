@@ -7,8 +7,8 @@ inventories a repository that has not been onboarded yet.
   a `contract`, a generator `source`, an `excluded` document with a recorded
   reason, or `UNCOVERED`. With `--crd-glob` it also requires every
   CustomResourceDefinition manifest to be matched by the glob the CRD check uses.
-- It also lists per-contract baselines and warns when one is newer than the default
-  baseline (`--baseline-ref` or `spec.baseline.refs`), which loosens protection.
+- It also lists per-contract baselines and warns when one is newer than, narrower than, or diverged from the default
+  baseline (`--baseline-ref` or `spec.baseline.refs`), each of which loosens protection.
 - `discover` needs no descriptor. It lists the documents, labels each `bundled`,
   `source`, or `standalone`, and suggests a `matchPath` and generator adapter.
 

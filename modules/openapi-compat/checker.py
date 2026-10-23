@@ -217,25 +217,30 @@ def exists_at(repo, sha, relative):
 
 
 def find_moved_artifact(repo, sha, match_path, yq, workdir, skip):
-    """Find an OpenAPI document at the baseline that already serves this contract's paths.
+    """Find an OpenAPI document at the baseline that may be this contract's earlier self.
 
     Used when the declared artifact is absent: if the API existed under another
-    name, calling it "new" would silently drop its protection. Skipped for the
-    catch-all matchPath, which cannot tell one API from another.
+    name, calling it "new" would silently drop its protection.
+
+    Returns ``(path, catch_all)``. With a specific matchPath, a document counts only
+    if it already serves paths matching it. A catch-all matchPath cannot tell one API
+    from another, so any other OpenAPI document at the baseline is returned and the
+    caller must fail closed rather than grant the "new" exemption.
     """
-    if match_path in (None, "", ".*"):
-        return None
     result = command(
         ["git", "--no-replace-objects", "grep", "-l", "-I", "-E",
          "-e", r"^(openapi|swagger)[[:space:]]*:", "-e", r'"(openapi|swagger)"[[:space:]]*:',
          sha, "--", "*.yaml", "*.yml", "*.json"],
         cwd=repo, check=False,
     )
+    catch_all = match_path in (None, "", ".*")
     prefix = f"{sha}:"
     for line in result.stdout.splitlines():
         relative = line[len(prefix):] if line.startswith(prefix) else line
         if relative == skip:
             continue
+        if catch_all:
+            return relative, True
         probe = Path(workdir) / "moved-probe.yaml"
         raw = command(["git", "--no-replace-objects", "show", f"{sha}:{relative}"], cwd=repo, check=False)
         if raw.returncode:
@@ -243,10 +248,10 @@ def find_moved_artifact(repo, sha, match_path, yq, workdir, skip):
         probe.write_text(raw.stdout, encoding="utf-8")
         try:
             if spec_has_paths(yq, probe, workdir, match_path):
-                return relative
+                return relative, False
         except CheckError:
             continue
-    return None
+    return None, False
 
 
 def check_compatibility(args, output, report):
@@ -305,7 +310,14 @@ def check_compatibility(args, output, report):
                     f"Contract {contract_id!r} names baseline {sha} explicitly, but {baseline_path} "
                     "does not exist there; fix the baseline, or set baseline.artifact if the file was moved"
                 )
-            moved = find_moved_artifact(repo, sha, match_path, yq, output, baseline_path)
+            moved, catch_all = find_moved_artifact(repo, sha, match_path, yq, output, baseline_path)
+            if moved and catch_all:
+                raise CheckError(
+                    f"{declared_artifact} does not exist at baseline {sha}, but {moved} does, and contract "
+                    f"{contract_id!r} has a catch-all matchPath, so it cannot tell whether the API is new or "
+                    f"was renamed. Set a specific matchPath, or declare baseline: {{refs: [{sha}], "
+                    f"artifact: {moved}, reason: ...}} if it was renamed"
+                )
             if moved:
                 raise CheckError(
                     f"{declared_artifact} does not exist at baseline {sha}, but {moved} there already serves "

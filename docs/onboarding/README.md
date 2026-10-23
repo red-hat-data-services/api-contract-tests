@@ -93,6 +93,8 @@ for CRDs when the baseline has no CRDs at all. Two cases stay errors because the
 would otherwise hide a configuration mistake: a baseline that has the artifact but
 no paths under `matchPath` (wrong version), and an artifact that exists at the
 baseline under a different name (a move or rename; the error names the old file).
+With a catch-all `matchPath` the check cannot tell a rename from a new API, so it
+fails closed whenever another OpenAPI document exists at the baseline.
 
 **Per-contract baselines.** The repository default applies to every contract. To
 give one contract its own baseline, for example to scope an intentional break to a
@@ -112,7 +114,10 @@ A contract's own baseline is a promise: the artifact must exist at those commits
 or the check fails. Precedence is the contract's `baseline`, then the workflow or
 runner `--baseline-ref` (the repository default), then `spec.baseline.refs` in the
 descriptor. `coverage` lists every per-contract baseline and warns when one is
-newer than the default, because that loosens protection for that contract.
+newer than the default, keeps fewer of the default baselines (for example
+`[A]` when the default is `[A, B]`), or cannot be ordered against it, because each
+loosens protection for that contract. Pass the default as `baseline-refs` to the
+coverage workflow (and use a full checkout) so this works in CI.
 
 ## Moving from report to enforce
 

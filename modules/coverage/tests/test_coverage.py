@@ -333,3 +333,50 @@ spec:
         self.set_baseline(["main"])
         result, _ = self.run()
         assert result.returncode == 2 and "full 40- or 64-character" in result.stderr
+
+    def test_overlapping_crd_globs_are_all_recorded_as_matching(self):
+        self.write("config/crd/widgets.yaml", CRD)
+        result, report = self.run("coverage", "--crd-glob", "config/**/*.yaml", "--crd-glob", "config/crd/*.yaml")
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["crds"][0]["globs"] == ["config/**/*.yaml", "config/crd/*.yaml"]
+        assert not any("matches no CustomResourceDefinition" in text for text in report["problems"])
+
+    def test_overlapping_crd_excludes_are_all_recorded_as_used(self):
+        self.write("config/crd/widgets.yaml", CRD)
+        self.write("testdata/mock.yaml", CRD.replace("widgets", "mocks").replace("Widget", "Mock"))
+        result, report = self.run("coverage", "--crd-glob", "config/crd/*.yaml",
+                                  "--crd-exclude", "testdata/*", "--crd-exclude", "testdata/mock.yaml")
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert not any("--crd-exclude" in text for text in report["warnings"])
+
+    def test_per_contract_baseline_that_drops_a_default_baseline_is_flagged_narrower(self):
+        first = self.commit_all("first")
+        self.write("README.md", "later\n")
+        second = self.commit_all("second")
+        self.set_baseline([first])
+        result, report = self.run("coverage", "--baseline-ref", first, "--baseline-ref", second)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["baselines"][0]["relation_to_default"] == "narrower"
+        assert any("narrower than the default" in text and second[:12] in text for text in report["warnings"])
+
+    def test_per_contract_baseline_equal_to_the_default_set_is_same(self):
+        first = self.commit_all("first")
+        self.write("README.md", "later\n")
+        second = self.commit_all("second")
+        self.set_baseline([second, first])
+        _, report = self.run("coverage", "--baseline-ref", first, "--baseline-ref", second)
+        assert report["baselines"][0]["relation_to_default"] == "same"
+        assert not any("loosens" in text for text in report["warnings"])
+
+    def test_unrelated_baseline_is_flagged_as_diverged(self):
+        base = self.commit_all("base")
+        self.git("checkout", "-q", "-b", "side")
+        self.write("side.txt", "side\n")
+        side = self.commit_all("side")
+        self.git("checkout", "-q", "main")
+        self.write("main.txt", "main\n")
+        main = self.commit_all("main")
+        self.set_baseline([side])
+        _, report = self.run("coverage", "--baseline-ref", main)
+        assert report["baselines"][0]["relation_to_default"] == "diverged"
+        assert any("neither older nor newer" in text for text in report["warnings"])

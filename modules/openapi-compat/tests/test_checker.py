@@ -255,6 +255,22 @@ class TestOpenAPICompatChecker:
         assert "moved or renamed" in result.stderr
         assert "api/openapi/legacy-service.yaml" in result.stderr
 
+    def test_catch_all_match_path_fails_closed_when_another_document_exists_at_baseline(self):
+        # Without a specific matchPath the checker cannot tell "renamed" from "new".
+        self.set_descriptor("del(.spec.contracts[0].matchPath)")
+        moved = self.moved_commit()
+        result, report, _ = self.check(refs=[moved])
+        assert result.returncode == 2, result.stdout + result.stderr
+        assert report["status"] == "error"
+        assert "catch-all matchPath" in result.stderr
+        assert "api/openapi/legacy-service.yaml" in result.stderr
+
+    def test_catch_all_match_path_is_new_when_the_baseline_has_no_openapi_documents(self):
+        self.set_descriptor("del(.spec.contracts[0].matchPath)")
+        result, report, _ = self.check(refs=[self.early_commit()])
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["status"] == "new"
+
     def test_baseline_artifact_override_compares_a_moved_document(self):
         moved = self.moved_commit()
         self.set_descriptor(

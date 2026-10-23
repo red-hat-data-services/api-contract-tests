@@ -230,9 +230,10 @@ def classify_openapi(repo, descriptor, documents):
 def baseline_overview(repo, descriptor, default_refs):
     """List per-contract baselines and flag any newer than the repository default.
 
-    A per-contract baseline that is newer than the default loosens protection for
-    that contract (fewer past releases stay compatible), so it is surfaced for
-    reviewers. Older or equal baselines are listed without a warning.
+    A per-contract baseline that is newer than the default, or keeps fewer of the
+    default baselines, loosens protection for that contract, so it is surfaced for
+    reviewers. A baseline that cannot be ordered against the default is flagged too.
+    Older or equal baselines are listed without a warning.
     """
     spec = descriptor.get("spec", {})
     default = list(default_refs) or ((spec.get("baseline") or {}).get("refs") or [])
@@ -258,6 +259,17 @@ def baseline_overview(repo, descriptor, default_refs):
                     f"contract {contract_id}: baseline {refs[0][:12]} is newer than the default baseline; "
                     "this loosens protection for this contract"
                 )
+            elif relation == "narrower":
+                dropped = ", ".join(ref[:12] for ref in default if ref not in refs)
+                warnings.append(
+                    f"contract {contract_id}: baseline is narrower than the default (drops {dropped}); "
+                    "this loosens protection for this contract"
+                )
+            elif relation == "diverged":
+                warnings.append(
+                    f"contract {contract_id}: baseline is neither older nor newer than the default; "
+                    "check that it does not loosen protection"
+                )
             elif relation == "unresolved":
                 warnings.append(f"contract {contract_id}: could not compare its baseline with the default (fetch the commits first)")
         rows.append({
@@ -276,8 +288,11 @@ def _is_ancestor(repo, older, newer):
 
 def _relation(repo, refs, default):
     try:
-        if set(refs) <= set(default):
+        if set(refs) == set(default):
             return "same"
+        if set(refs) < set(default):
+            # Fewer baselines than the default: the dropped ones are no longer kept compatible.
+            return "narrower"
         if all(_is_ancestor(repo, d, r) for r in refs for d in default):
             return "newer"
         if all(_is_ancestor(repo, r, d) for r in refs for d in default):
@@ -297,14 +312,16 @@ def classify_crds(crds, globs, excludes=()):
     rows, problems, warnings = [], [], []
     matched_globs, used_excludes = set(), set()
     for path in crds:
-        hit = next((pattern for pattern in globs if fnmatch.fnmatch(path, pattern)), None)
-        skip = next((pattern for pattern in excludes if fnmatch.fnmatch(path, pattern)), None)
-        if hit:
-            matched_globs.add(hit)
-            rows.append({"path": path, "status": "covered", "glob": hit})
-        elif skip:
-            used_excludes.add(skip)
-            rows.append({"path": path, "status": "excluded", "reason": f"--crd-exclude {skip}"})
+        # Record every pattern that matches, not just the first: overlapping globs are
+        # legitimate, and a pattern shadowed by an earlier one is not "matching nothing".
+        hits = [pattern for pattern in globs if fnmatch.fnmatch(path, pattern)]
+        skips = [pattern for pattern in excludes if fnmatch.fnmatch(path, pattern)]
+        if hits:
+            matched_globs.update(hits)
+            rows.append({"path": path, "status": "covered", "glob": hits[0], "globs": hits})
+        elif skips:
+            used_excludes.update(skips)
+            rows.append({"path": path, "status": "excluded", "reason": f"--crd-exclude {skips[0]}", "excludes": skips})
         else:
             rows.append({"path": path, "status": "uncovered"})
             problems.append(f"{path} is a CustomResourceDefinition matched by none of the --crd-glob patterns")
@@ -444,7 +461,8 @@ def render_coverage(report):
         lines.append("Per-contract baselines (override the repository default):")
         for item in report["baselines"]:
             shas = ", ".join(ref[:12] for ref in item["refs"])
-            relation = f" [{item['relation_to_default']} than default]" if item["relation_to_default"] in ("newer", "older") else ""
+            kind = item["relation_to_default"]
+            relation = f" [{kind} than default]" if kind in ("newer", "older", "narrower") else (" [diverged from default]" if kind == "diverged" else "")
             lines.append(f"  {item['contract']}: {shas}{relation}  {item['reason']}")
     for text in report["warnings"]:
         lines.append(f"warning: {text}")

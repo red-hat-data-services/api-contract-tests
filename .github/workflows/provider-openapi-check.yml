@@ -46,11 +46,16 @@ jobs:
 
       - name: Require a pinned reusable-workflow ref
         env:
-          TOOL_REF: ${{ job.workflow_sha }}
+          WORKFLOW_REF: ${{ job.workflow_ref }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
         run: |
           set -euo pipefail
-          if [[ ! "$TOOL_REF" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Call this workflow by a full commit SHA, not a branch or tag: $TOOL_REF" >&2
+          # job.workflow_sha is always the resolved commit, even when the caller wrote a
+          # branch or tag, so it cannot show how the caller pinned. job.workflow_ref ends
+          # with the ref the caller wrote after '@'; require a full commit SHA there.
+          pinned="${WORKFLOW_REF##*@}"
+          if [[ ! "$pinned" =~ ^[0-9a-f]{40}$ || "$pinned" != "$WORKFLOW_SHA" ]]; then
+            echo "::error::Call this workflow by a full commit SHA, not a branch or tag: $WORKFLOW_REF"
             exit 2
           fi
 
