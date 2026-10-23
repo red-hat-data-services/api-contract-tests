@@ -283,3 +283,53 @@ spec:
         result, _ = self.run("coverage", "--crd-glob", "config/crd/*.yaml")
         assert result.returncode == 2
         assert "Descriptor not found" in result.stderr
+
+    # ---- per-contract baselines -------------------------------------------------------
+
+    def commit_all(self, message):
+        self.git("-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", ".")
+        self.git("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", message)
+        return self.git("rev-parse", "HEAD").stdout.strip()
+
+    def set_baseline(self, refs, reason="scoped exception"):
+        block = {"refs": refs}
+        if reason is not None:
+            block["reason"] = reason
+        coverage.openapi.command(
+            [self.yq, "eval", "-i", f".spec.contracts[0].baseline = {json.dumps(block)}",
+             self.repo / ".rhoai/contracts.yaml"], cwd=self.repo)
+
+    def test_per_contract_baseline_newer_than_default_is_flagged(self):
+        older = self.commit_all("older")
+        self.write("README.md", "later\n")
+        newer = self.commit_all("newer")
+        self.set_baseline([newer])
+        result, report = self.run("coverage", "--baseline-ref", older)
+        assert result.returncode == 0, result.stdout + result.stderr
+        row = report["baselines"][0]
+        assert row["contract"] == "service-v1" and row["relation_to_default"] == "newer"
+        assert any("loosens protection" in text for text in report["warnings"])
+
+    def test_per_contract_baseline_older_than_default_is_listed_without_a_warning(self):
+        older = self.commit_all("older")
+        self.write("README.md", "later\n")
+        newer = self.commit_all("newer")
+        self.set_baseline([older])
+        _, report = self.run("coverage", "--baseline-ref", newer)
+        assert report["baselines"][0]["relation_to_default"] == "older"
+        assert not any("loosens" in text for text in report["warnings"])
+
+    def test_per_contract_baseline_without_a_default_is_listed_unqualified(self):
+        sha = self.commit_all("only")
+        self.set_baseline([sha])
+        _, report = self.run()
+        assert report["baselines"][0]["relation_to_default"] is None
+
+    def test_per_contract_baseline_needs_a_reason_and_a_full_sha(self):
+        sha = self.commit_all("only")
+        self.set_baseline([sha], reason=None)
+        result, _ = self.run()
+        assert result.returncode == 2 and "needs a 'reason'" in result.stderr
+        self.set_baseline(["main"])
+        result, _ = self.run()
+        assert result.returncode == 2 and "full 40- or 64-character" in result.stderr

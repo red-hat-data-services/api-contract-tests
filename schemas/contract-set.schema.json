@@ -29,6 +29,12 @@
           "minItems": 1,
           "items": { "$ref": "#/$defs/contract" }
         },
+        "baseline": {
+          "type": "object",
+          "description": "Repository default baseline, used when the runner is not given --baseline-ref. A contract that is absent at a default baseline is reported as new, not as a failure.",
+          "required": ["refs"],
+          "properties": { "refs": { "$ref": "#/$defs/baselineRefs" } }
+        },
         "exclusions": {
           "type": "array",
           "description": "OpenAPI documents in this repository that are deliberately not contracts (for example an internal UI API). Read by the coverage check; a document that is neither a contract, a generator input, nor listed here is reported as uncovered.",
@@ -45,6 +51,12 @@
     }
   },
   "$defs": {
+    "baselineRefs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$" },
+      "description": "Full Git SHAs. Mutable refs (branches, tags, HEAD) are rejected."
+    },
     "generator": {
       "type": "object",
       "required": ["adapter"],
@@ -94,6 +106,16 @@
           "default": ".*"
         },
         "generator": { "$ref": "#/$defs/generator" },
+        "baseline": {
+          "type": "object",
+          "description": "Overrides the repository default baseline for this contract, for example to scope an intentional break to one API. Explicit: the artifact must exist at these commits, otherwise the check fails (the default baseline instead treats an absent artifact as new). Newer-than-default baselines are flagged by the coverage check.",
+          "required": ["refs", "reason"],
+          "properties": {
+            "refs": { "$ref": "#/$defs/baselineRefs" },
+            "reason": { "type": "string", "minLength": 1, "description": "Why this contract has its own baseline; reviewers read this" },
+            "artifact": { "type": "string", "description": "Repo-relative path of the artifact at these commits, when it was later moved or renamed (defaults to declaredArtifact)" }
+          }
+        },
         "policy": {
           "type": "object",
           "required": ["oasdiffVersion", "yqVersion"],

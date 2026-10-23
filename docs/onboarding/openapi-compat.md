@@ -128,6 +128,31 @@ once report-only evidence and owner agreement support gating merges.
 Read `report.json.status`, not just the exit code: report-only mode exits
 `0` even when breaking findings are recorded.
 
+### Baselines
+
+`--baseline-ref` (or the workflow's `baseline-refs`) is the repository default.
+A contract can override it with its own `baseline` block (`refs`, a mandatory
+`reason`, and optionally `artifact` when the file was later moved), and the
+descriptor can carry the default as `spec.baseline.refs` instead. Precedence is
+the contract's `baseline`, then `--baseline-ref`, then `spec.baseline.refs`.
+
+- **New APIs are not failures.** If the declared artifact does not exist at a
+  default baseline, the contract is reported with `status: new` for that baseline
+  and nothing is compared. If every baseline predates the API, `report.json.status`
+  is `new`, which is neither a pass on compatibility nor a failure. The candidate
+  is still generated, checked for staleness and validated.
+- **A contract's own baseline is a promise.** The artifact must exist there, or
+  the check fails.
+- **Moves are not silently "new".** If the artifact is absent but another OpenAPI
+  document at that baseline already serves the contract's `matchPath` paths, the
+  check fails and names it; set `baseline.artifact` to compare across the rename.
+  (A catch-all `matchPath` cannot distinguish APIs, so this guard needs a specific
+  one.)
+- **Wrong versions still fail.** A baseline that has the file but no paths under
+  `matchPath` is an error.
+
+See the [checklist](README.md#choosing-a-baseline) for when to use an override.
+
 ### Confirm nothing is left out
 
 ```bash
@@ -180,7 +205,7 @@ jobs:
     with:
       contract-set: .rhoai/contracts.yaml
       contract-id: ${{ matrix.contract-id }}
-      baseline-refs: <full-git-sha>
+      baseline-refs: <full-git-sha>   # optional if the descriptor declares baselines
       oasdiff-version: "1.33.0"
       yq-version: "4.45.1"
       mode: report

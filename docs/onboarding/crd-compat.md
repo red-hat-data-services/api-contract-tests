@@ -47,6 +47,13 @@ python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/contract-tests/cl
 Baselines must be full Git SHAs. Mutable refs such as `main`, tags, and branches
 are rejected.
 
+## New CRDs
+
+A CRD that exists in the pull request but not in the baseline is new and is not
+compared. When the baseline has no CRD manifests at all, the check reports
+`status: new` and does not fail. If the baseline has CRD manifests but none match
+your glob, that is a configuration error and still fails.
+
 ## Confirm every CRD is covered
 
 The glob decides which manifests are compared, so a CRD that moves or is added

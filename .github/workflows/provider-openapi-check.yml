@@ -17,9 +17,13 @@ on:
         type: string
         default: report
       baseline-refs:
-        description: Space-separated full Git SHAs
-        required: true
+        description: >-
+          Space-separated full Git SHAs; the repository default baseline. Optional when the
+          descriptor declares spec.baseline.refs or every contract declares its own baseline.
+          A contract's own baseline always takes precedence.
+        required: false
         type: string
+        default: ""
       oasdiff-version:
         description: Exact oasdiff version declared by the provider descriptor
         required: true
@@ -129,12 +133,19 @@ jobs:
           print(f"- **Result:** {status}")
           print(f"- **Findings:** {finding_count}")
           print()
-          print("| Baseline | Compatible | Findings |")
-          print("| --- | --- | --- |")
+          print("| Baseline | Source | Compatible | Findings |")
+          print("| --- | --- | --- | --- |")
           for baseline in baselines:
-              compatible = "yes" if baseline.get("compatible") else "no"
+              if baseline.get("status") == "new":
+                  compatible = "new (not in baseline)"
+              else:
+                  compatible = "yes" if baseline.get("compatible") else "no"
               baseline_findings = len(baseline.get("findings", []))
-              print(f"| `{baseline.get('sha', 'unknown')}` | {compatible} | {baseline_findings} |")
+              print(f"| `{baseline.get('sha', 'unknown')}` | {baseline.get('source', 'default')} | {compatible} | {baseline_findings} |")
+          if status == "new":
+              print()
+              print("This API does not exist at any baseline yet, so nothing was compared. "
+                    "It becomes protected once a baseline that contains it is adopted.")
 
           if status == "breaking":
               message = f"{label}: {status} ({mode}); {finding_count} breaking findings. Download the contract-report artifact for details."

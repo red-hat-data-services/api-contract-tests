@@ -58,8 +58,10 @@ def main(argv=None):
     check.add_argument("--contract-set", type=Path, required=True,
                         help="Path to the ContractSet descriptor, relative to --repo (e.g. .rhoai/contracts.yaml)")
     check.add_argument("--contract-id", help="Contract id to run; required if the descriptor registers more than one")
-    check.add_argument("--baseline-ref", action="append", required=True,
-                       help="Full resolved Git SHA; repeat for every supported baseline. Mutable refs are rejected.")
+    check.add_argument("--baseline-ref", action="append",
+                       help="Full resolved Git SHA; repeat for every supported baseline. Mutable refs are rejected. "
+                            "The repository default: a contract's own baseline in the descriptor takes precedence, "
+                            "and spec.baseline.refs is used when this is omitted")
     check.add_argument("--output-dir", type=Path, required=True,
                         help="New report directory; existing paths are never overwritten")
     check.add_argument("--enforce", action="store_true", help="Exit 1 for breaking changes; default is report-only")
@@ -88,6 +90,9 @@ def main(argv=None):
     coverage.add_argument("--crd-exclude", action="append", default=[],
                           help="Repository-relative glob of CRD manifests that are deliberately not checked "
                                "(for example mocked CRDs used as test data); repeat as needed")
+    coverage.add_argument("--baseline-ref", action="append", default=[],
+                          help="The repository default baseline (full Git SHA); used only to flag per-contract "
+                               "baselines that are newer than it")
     coverage.add_argument("--format", choices=("text", "json"), default="text")
     coverage.add_argument("--report-only", action="store_true",
                           help="Exit 0 even when gaps are found; integrity errors still exit 2")

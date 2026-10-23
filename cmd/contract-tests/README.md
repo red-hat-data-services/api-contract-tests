@@ -13,6 +13,11 @@ python3 cmd/contract-tests/cli.py check \
   [--contract-id <id>] [--enforce] [--oasdiff <path>] [--yq <path>]
 ```
 
+`--baseline-ref` is the repository default and is optional when the descriptor
+declares `spec.baseline.refs` or the contract its own `baseline`. An API absent
+at a default baseline is reported as `new`, not a failure; see
+[`docs/onboarding`](../../docs/onboarding/README.md#choosing-a-baseline).
+
 The same command runs locally and in CI — there is no separate "CI mode" —
 so a result is always reproducible without a cluster. See
 [`docs/onboarding/openapi-compat.md`](../../docs/onboarding/openapi-compat.md).
@@ -36,6 +41,7 @@ Coverage and discovery:
 python3 cmd/contract-tests/cli.py coverage \
   --repo /path/to/provider/checkout \
   [--contract-set .rhoai/contracts.yaml] [--crd-glob 'config/crd/**/*.yaml'] \
+  [--baseline-ref <full-sha>] \
   [--format text|json] [--report-only] [--yq <path>]
 
 # Inventory a repository and suggest contract shapes; needs no descriptor.

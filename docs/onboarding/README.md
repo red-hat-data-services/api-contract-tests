@@ -52,7 +52,8 @@ repository supplies the runner, schemas, and reusable workflows.
    ```
 
    Every OpenAPI document must be a contract, a generator input, or an
-   exclusion with a reason. Fix gaps by registering the document or excluding
+   exclusion with a reason. It also lists per-contract baselines and flags any
+   newer than the default. Fix gaps by registering the document or excluding
    it. Never by deleting the check.
 
 6. **Add the workflow** in report mode, pinned to a full commit SHA of this
@@ -71,17 +72,47 @@ repository supplies the runner, schemas, and reusable workflows.
 
 ## Choosing a baseline
 
-The baseline is a full Git SHA of your own repository. Which commit to use is
-a per-repository decision that the working group has not yet standardized; the
-two candidates are the head of the last EA release and the head of the last
-minor release. Whatever you choose:
+The baseline is a full Git SHA of your own repository, and it defines what counts
+as released: whatever exists there must stay compatible; whatever does not exist
+there yet is new and may still change. Which commit to use (the last EA release or
+the last minor release) is a per-repository decision that the working group has
+not standardized. Whatever you choose:
 
 - there should be no breaking API change within one major version, so moving
   the baseline forward is an exception that someone other than the author must
   approve;
-- pass several `baseline-refs` when more than one supported release must stay
-  compatible;
+- pass several baselines when more than one supported release must stay
+  compatible; each contract is compared only against the baselines that contain it;
 - never use a branch name, tag, or `HEAD`; the runner rejects them.
+
+**New APIs.** If a contract's artifact does not exist at a baseline, the contract
+is reported as `new` for that baseline: nothing is compared and the check does not
+fail, even when enforced. It is protected as soon as you adopt a baseline that
+contains it, for example when the release that first ships it is cut. The same holds
+for CRDs when the baseline has no CRDs at all. Two cases stay errors because they
+would otherwise hide a configuration mistake: a baseline that has the artifact but
+no paths under `matchPath` (wrong version), and an artifact that exists at the
+baseline under a different name (a move or rename; the error names the old file).
+
+**Per-contract baselines.** The repository default applies to every contract. To
+give one contract its own baseline, for example to scope an intentional break to a
+single API without moving everyone else's baseline, add a `baseline` block to that
+contract in `.rhoai/contracts.yaml` with a `reason`:
+
+```yaml
+contracts:
+  - id: your-service-v1
+    baseline:
+      refs: ["<full-git-sha>"]
+      reason: Intentional removal of /items/legacy agreed with the Dashboard team (RHOAIENG-1234)
+      # artifact: old/path/openapi.yaml   # only if the file was later moved
+```
+
+A contract's own baseline is a promise: the artifact must exist at those commits
+or the check fails. Precedence is the contract's `baseline`, then the workflow or
+runner `--baseline-ref` (the repository default), then `spec.baseline.refs` in the
+descriptor. `coverage` lists every per-contract baseline and warns when one is
+newer than the default, because that loosens protection for that contract.
 
 ## Moving from report to enforce
 

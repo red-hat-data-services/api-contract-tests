@@ -227,6 +227,66 @@ def classify_openapi(repo, descriptor, documents):
     return rows, problems, warnings, scope
 
 
+def baseline_overview(repo, descriptor, default_refs):
+    """List per-contract baselines and flag any newer than the repository default.
+
+    A per-contract baseline that is newer than the default loosens protection for
+    that contract (fewer past releases stay compatible), so it is surfaced for
+    reviewers. Older or equal baselines are listed without a warning.
+    """
+    spec = descriptor.get("spec", {})
+    default = list(default_refs) or ((spec.get("baseline") or {}).get("refs") or [])
+    rows, warnings = [], []
+    for contract in spec.get("contracts", []):
+        block = contract.get("baseline") if isinstance(contract, dict) else None
+        if block is None:
+            continue
+        contract_id = contract.get("id", "<unnamed>")
+        refs = block.get("refs") if isinstance(block, dict) else None
+        reason = block.get("reason") if isinstance(block, dict) else None
+        if not isinstance(refs, list) or not refs:
+            raise CheckError(f"contract {contract_id}: baseline.refs must be a non-empty list of full Git SHAs")
+        for ref in refs:
+            openapi.validate_baseline_ref(ref)
+        if not isinstance(reason, str) or not reason.strip():
+            raise CheckError(f"contract {contract_id}: baseline needs a 'reason'")
+        relation = None
+        if default:
+            relation = _relation(repo, refs, default)
+            if relation == "newer":
+                warnings.append(
+                    f"contract {contract_id}: baseline {refs[0][:12]} is newer than the default baseline; "
+                    "this loosens protection for this contract"
+                )
+            elif relation == "unresolved":
+                warnings.append(f"contract {contract_id}: could not compare its baseline with the default (fetch the commits first)")
+        rows.append({
+            "contract": contract_id, "refs": refs, "reason": reason.strip(),
+            "artifact": block.get("artifact"), "relation_to_default": relation,
+        })
+    return rows, warnings
+
+
+def _is_ancestor(repo, older, newer):
+    result = openapi.command(["git", "--no-replace-objects", "merge-base", "--is-ancestor", older, newer], cwd=repo, check=False)
+    if result.returncode not in (0, 1):
+        raise CheckError("unresolved")
+    return result.returncode == 0
+
+
+def _relation(repo, refs, default):
+    try:
+        if set(refs) <= set(default):
+            return "same"
+        if all(_is_ancestor(repo, d, r) for r in refs for d in default):
+            return "newer"
+        if all(_is_ancestor(repo, r, d) for r in refs for d in default):
+            return "older"
+        return "diverged"
+    except CheckError:
+        return "unresolved"
+
+
 def classify_crds(crds, globs, excludes=()):
     """Match CRD manifests against the globs the CRD check uses.
 
@@ -379,6 +439,13 @@ def render_coverage(report):
                 f"  {item['contract']}: {item['outside_match_path']} of {item['paths']} paths in "
                 f"{item['artifact']} fall outside {item['match_path']!r}"
             )
+    if report["baselines"]:
+        lines.append("")
+        lines.append("Per-contract baselines (override the repository default):")
+        for item in report["baselines"]:
+            shas = ", ".join(ref[:12] for ref in item["refs"])
+            relation = f" [{item['relation_to_default']} than default]" if item["relation_to_default"] in ("newer", "older") else ""
+            lines.append(f"  {item['contract']}: {shas}{relation}  {item['reason']}")
     for text in report["warnings"]:
         lines.append(f"warning: {text}")
     for text in report["problems"]:
@@ -392,7 +459,7 @@ def run_coverage(args):
     repo = args.repo.resolve()
     report = {
         "status": "error", "repo": str(repo), "contract_set": str(args.contract_set),
-        "openapi": [], "crds": [], "crd_manifests_found": 0, "path_scope": [],
+        "openapi": [], "crds": [], "crd_manifests_found": 0, "path_scope": [], "baselines": [],
         "problems": [], "warnings": [], "errors": [],
     }
     code = 2
@@ -412,6 +479,8 @@ def run_coverage(args):
             rows, problems, warnings, scope = classify_openapi(repo, descriptor, documents)
             report["openapi"], report["problems"], report["warnings"] = rows, problems, warnings
             report["path_scope"] = [path_scope(yq, repo, *item) for item in scope]
+            report["baselines"], baseline_warnings = baseline_overview(repo, descriptor, args.baseline_ref)
+            report["warnings"].extend(baseline_warnings)
         elif args.crd_glob and not documents:
             # A repository that ships only CRDs has no OpenAPI contracts to register,
             # so there is no descriptor to read; only the CRD globs are checked.

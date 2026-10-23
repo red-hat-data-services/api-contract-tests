@@ -175,11 +175,85 @@ def select_contract(descriptor, contract_id):
     return matches[0]
 
 
+def contract_baselines(args, descriptor, contract):
+    """Resolve which baselines a contract is compared against, and where they came from.
+
+    Precedence: the contract's own ``baseline`` block, then ``--baseline-ref`` (the
+    repository default, normally supplied by the workflow), then ``spec.baseline``
+    in the descriptor. A contract's own baseline is an explicit promise that the
+    artifact exists there; the repository default is not.
+    """
+    contract_id = contract.get("id")
+    block = contract.get("baseline")
+    if block is not None:
+        refs = block.get("refs") if isinstance(block, dict) else None
+        reason = block.get("reason") if isinstance(block, dict) else None
+        artifact = block.get("artifact") if isinstance(block, dict) else None
+        if not isinstance(refs, list) or not refs or any(not isinstance(ref, str) for ref in refs):
+            raise CheckError(f"Contract {contract_id!r}: baseline.refs must be a non-empty list of full Git SHAs")
+        if not isinstance(reason, str) or not reason.strip():
+            raise CheckError(
+                f"Contract {contract_id!r}: baseline needs a 'reason'; a per-contract baseline "
+                "without a recorded justification is not accepted"
+            )
+        if artifact is not None and (not isinstance(artifact, str) or not artifact):
+            raise CheckError(f"Contract {contract_id!r}: baseline.artifact must be a repo-relative path")
+        return [(ref, "contract") for ref in refs], artifact, True
+    if args.baseline_ref:
+        return [(ref, "default") for ref in args.baseline_ref], None, False
+    default = descriptor.get("spec", {}).get("baseline")
+    refs = default.get("refs") if isinstance(default, dict) else None
+    if isinstance(refs, list) and refs and all(isinstance(ref, str) for ref in refs):
+        return [(ref, "default") for ref in refs], None, False
+    raise CheckError(
+        f"Contract {contract_id!r} has no baseline: pass --baseline-ref, or declare "
+        "spec.baseline.refs or contract baseline.refs in the descriptor"
+    )
+
+
+def exists_at(repo, sha, relative):
+    result = command(["git", "--no-replace-objects", "cat-file", "-e", f"{sha}:{relative}"], cwd=repo, check=False)
+    return result.returncode == 0
+
+
+def find_moved_artifact(repo, sha, match_path, yq, workdir, skip):
+    """Find an OpenAPI document at the baseline that already serves this contract's paths.
+
+    Used when the declared artifact is absent: if the API existed under another
+    name, calling it "new" would silently drop its protection. Skipped for the
+    catch-all matchPath, which cannot tell one API from another.
+    """
+    if match_path in (None, "", ".*"):
+        return None
+    result = command(
+        ["git", "--no-replace-objects", "grep", "-l", "-I", "-E",
+         "-e", r"^(openapi|swagger)[[:space:]]*:", "-e", r'"(openapi|swagger)"[[:space:]]*:',
+         sha, "--", "*.yaml", "*.yml", "*.json"],
+        cwd=repo, check=False,
+    )
+    prefix = f"{sha}:"
+    for line in result.stdout.splitlines():
+        relative = line[len(prefix):] if line.startswith(prefix) else line
+        if relative == skip:
+            continue
+        probe = Path(workdir) / "moved-probe.yaml"
+        raw = command(["git", "--no-replace-objects", "show", f"{sha}:{relative}"], cwd=repo, check=False)
+        if raw.returncode:
+            continue
+        probe.write_text(raw.stdout, encoding="utf-8")
+        try:
+            if spec_has_paths(yq, probe, workdir, match_path):
+                return relative
+        except CheckError:
+            continue
+    return None
+
+
 def check_compatibility(args, output, report):
     repo = args.repo.resolve()
     oasdiff = tool_path("oasdiff", args.oasdiff, repo)
     yq = tool_path("yq", args.yq, repo)
-    for ref in args.baseline_ref:
+    for ref in args.baseline_ref or []:
         validate_baseline_ref(ref)
 
     descriptor = load_descriptor(repo / args.contract_set, yq, repo)
@@ -219,16 +293,38 @@ def check_compatibility(args, output, report):
         "severity_overrides": severity_overrides, "fail_on": "WARN", "match_path": match_path,
     }
 
-    for ref in args.baseline_ref:
+    baselines, baseline_artifact, explicit = contract_baselines(args, descriptor, contract)
+    for ref, _ in baselines:
+        validate_baseline_ref(ref)
+    baseline_path = baseline_artifact or declared_artifact
+    for ref, source in baselines:
         sha = resolve_commit(repo, ref)
+        if not exists_at(repo, sha, baseline_path):
+            if explicit:
+                raise CheckError(
+                    f"Contract {contract_id!r} names baseline {sha} explicitly, but {baseline_path} "
+                    "does not exist there; fix the baseline, or set baseline.artifact if the file was moved"
+                )
+            moved = find_moved_artifact(repo, sha, match_path, yq, output, baseline_path)
+            if moved:
+                raise CheckError(
+                    f"{declared_artifact} does not exist at baseline {sha}, but {moved} there already serves "
+                    f"paths matching {match_path!r}: the artifact was moved or renamed. Declare "
+                    f"baseline: {{refs: [{sha}], artifact: {moved}, reason: ...}} on contract {contract_id!r}"
+                )
+            report["baselines"].append({
+                "ref": ref, "sha": sha, "source": source, "status": "new",
+                "reason": f"{baseline_path} does not exist at this baseline; the API is new relative to it, so there is nothing to compare",
+            })
+            continue
         baseline = output / f"baseline-{sha}.yaml"
-        raw = command(["git", "--no-replace-objects", "show", f"{sha}:{declared_artifact}"], cwd=repo).stdout
+        raw = command(["git", "--no-replace-objects", "show", f"{sha}:{baseline_path}"], cwd=repo).stdout
         baseline.write_text(raw, encoding="utf-8")
         if not spec_has_paths(yq, baseline, output, match_path):
             raise CheckError(f"Baseline {ref!r} has no paths matching {match_path!r}; wrong API/version")
         validation = validate_spec(oasdiff, policy_file, baseline, output)
         report["baselines"].append({
-            "ref": ref, "sha": sha, "file": baseline.name,
+            "ref": ref, "sha": sha, "source": source, "status": "compared", "file": baseline.name,
             "sha256": digest(baseline), "validation_findings": validation,
         })
 
@@ -248,7 +344,8 @@ def check_compatibility(args, output, report):
     report["candidate"]["validation_findings"] = validate_spec(oasdiff, policy_file, candidate, output)
 
     breaking = False
-    for baseline in report["baselines"]:
+    compared = [baseline for baseline in report["baselines"] if baseline["status"] == "compared"]
+    for baseline in compared:
         cmd = [oasdiff, "breaking", "--config", policy_file, "--allow-external-refs=false",
                "--severity-levels", levels_file]
         if flatten_allof:
@@ -260,7 +357,11 @@ def check_compatibility(args, output, report):
         baseline["findings"] = findings(result, "breaking")
         baseline["compatible"] = result.returncode == 0
         breaking = breaking or not baseline["compatible"]
-    report["status"] = "breaking" if breaking else "compatible"
+    if not compared:
+        # Every baseline predates this API. Not a pass on compatibility, and not a failure.
+        report["status"] = "new"
+    else:
+        report["status"] = "breaking" if breaking else "compatible"
     return 1 if breaking and args.enforce else 0
 
 

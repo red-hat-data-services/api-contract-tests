@@ -61,7 +61,12 @@ Present a table: each document, its kind, path count, and your proposed disposit
 - Which baseline? A full SHA of the provider repository. The working group has not
   standardized EA versus minor release; ask which supported release the contract protects.
   Resolve it with `git rev-parse refs/remotes/<trusted-remote>/<branch>` and show the SHA
-  and its subject line.
+  and its subject line. An API that does not exist at the baseline is reported as `new`
+  and is not compared, so a baseline that predates a new API is fine; confirm with the
+  user when each API should become protected (when a baseline containing it is adopted).
+- Does any single API need a different baseline from the rest (for example an agreed
+  break)? Then give that contract a `baseline` block with a `reason`; do not move the
+  repository default.
 
 ### 3. Draft the descriptor
 
@@ -81,7 +86,7 @@ python3 $ACT/cmd/contract-tests/cli.py check --repo <provider> \
   --baseline-ref <full-sha> --output-dir /tmp/contract-report-<id>
 ```
 
-Read `report.json.status`, not just the exit code. Typical failures: the committed bundled
+Read `report.json.status`, not just the exit code (`new` means the API is absent at every baseline, so nothing was compared). Typical failures: the committed bundled
 document is stale (regenerate it with the provider's command and commit that separately),
 the baseline has no paths matching `matchPath` (wrong version or commit), or the generator
 needs a file that `sourceGlobs` does not copy.
