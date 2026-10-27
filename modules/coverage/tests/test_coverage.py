@@ -138,6 +138,21 @@ class TestCoverage:
         assert result.returncode == 0
         assert report["status"] == "gaps"
 
+    def test_json_output_writes_the_report_next_to_the_text_summary(self):
+        # The reusable workflow prints the text summary and annotates gaps from this file.
+        self.write("api/openapi/other.yaml", SPEC.format(title="Other", prefix="/other/v1"))
+        output = self.repo.parent / "coverage.json"
+        result = subprocess.run(
+            [sys.executable, str(CLI), "coverage", "--repo", str(self.repo), "--yq", str(self.yq),
+             "--report-only", "--json-output", str(output)],
+            capture_output=True, text=True, timeout=120,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "problem: api/openapi/other.yaml" in result.stdout
+        report = json.loads(output.read_text())
+        assert report["status"] == "gaps"
+        assert any("api/openapi/other.yaml" in text for text in report["problems"])
+
     def test_untracked_spec_is_found_but_ignored_files_are_not(self):
         self.write(".gitignore", "build/\n")
         self.write("build/generated.yaml", SPEC.format(title="Built", prefix="/b"))

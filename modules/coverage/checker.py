@@ -517,6 +517,8 @@ def run_coverage(args):
         report["errors"].append(str(error))
         print(str(error), file=sys.stderr)
 
+    if getattr(args, "json_output", None):
+        args.json_output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if args.format == "json":
         print(json.dumps(report, indent=2))
     elif report["errors"]:
