@@ -157,7 +157,7 @@ def merge_crds(documents: CrdMap, sources: dict[CrdKey, str], parsed: CrdMap, so
         sources[key] = source
 
 
-def load_candidate(repo: Path, files: list[Path]) -> tuple[CrdMap, list[dict[str, str]]]:
+def load_candidate(repo: Path, files: Sequence[Path]) -> tuple[CrdMap, list[dict[str, str]]]:
     documents: CrdMap = {}
     sources: dict[CrdKey, str] = {}
     records = []
@@ -169,7 +169,7 @@ def load_candidate(repo: Path, files: list[Path]) -> tuple[CrdMap, list[dict[str
     return documents, records
 
 
-def load_baseline(repo: Path, ref: str, files: list[Path]) -> tuple[CrdMap, list[dict[str, str]]]:
+def load_baseline(repo: Path, ref: str, files: Sequence[Path]) -> tuple[CrdMap, list[dict[str, str]]]:
     documents: CrdMap = {}
     sources: dict[CrdKey, str] = {}
     records = []

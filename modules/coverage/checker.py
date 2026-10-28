@@ -179,7 +179,7 @@ def generator_inputs(repo: Path, generator: Document) -> tuple[set[str], list[st
 
 
 def classify_openapi(
-    repo: Path, descriptor: Document, documents: list[str],
+    repo: Path, descriptor: Document, documents: Sequence[str],
 ) -> tuple[list[Document], list[str], list[str], list[tuple[str, str, str]]]:
     """Account for every discovered document against the descriptor."""
     exclusions = load_exclusions(descriptor)
@@ -306,7 +306,7 @@ def _is_ancestor(repo: Path, older: str, newer: str) -> bool:
     return result.returncode == 0
 
 
-def _relation(repo: Path, refs: list[str], default: list[str]) -> str:
+def _relation(repo: Path, refs: Sequence[str], default: Sequence[str]) -> str:
     try:
         if set(refs) == set(default):
             return "same"
@@ -323,7 +323,7 @@ def _relation(repo: Path, refs: list[str], default: list[str]) -> str:
 
 
 def classify_crds(
-    crds: list[str], globs: Sequence[str], excludes: Sequence[str] = (),
+    crds: Sequence[str], globs: Sequence[str], excludes: Sequence[str] = (),
 ) -> tuple[list[Document], list[str], list[str]]:
     """Match CRD manifests against the globs the CRD check uses.
 
@@ -428,7 +428,7 @@ def describe(yq: Path, repo: Path, relative: str, documents: set[str]) -> Docume
     return record
 
 
-def bundler_script_candidates(repo: Path, files: list[str]) -> list[str]:
+def bundler_script_candidates(repo: Path, files: Sequence[str]) -> list[str]:
     """Shell scripts that mention both openapi and yq, likely bundlers."""
     found = []
     for relative in files:
