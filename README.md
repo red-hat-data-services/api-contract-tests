@@ -90,7 +90,7 @@ policy and the remaining cluster-backed follow-on work.
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
-OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests cmd/action-pins/tests -v
+OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests cmd/action-pins/tests cmd/workflow-steps/tests -v
 ```
 
 CI also lints the workflows with [actionlint](https://github.com/rhysd/actionlint)
@@ -109,6 +109,12 @@ module directory has its own `checker.py`, so check one file at a time:
 ```bash
 for file in cmd/contract-tests/cli.py modules/*/*.py; do python3 -m mypy "$file"; done
 ```
+
+The provider workflows keep their logic in `cmd/workflow-steps/steps.py`
+(tested by `cmd/workflow-steps/tests`); the YAML only wires steps together. The
+`Workflow self-test` workflow (`.github/workflows/self-test.yml`) runs all three
+provider workflows end to end on every pull request, against the fixture provider
+in [`selftest/`](selftest/README.md).
 
 The test suite requires `oasdiff` v1.33.0 and `yq` v4.45.1:
 

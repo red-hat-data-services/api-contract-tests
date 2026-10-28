@@ -1,0 +1,37 @@
+name: Workflow self-test
+
+# Runs each provider workflow end to end against the fixture provider in selftest/,
+# so a workflow change is exercised on its own pull request. See selftest/README.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  openapi:
+    uses: ./.github/workflows/provider-openapi-check.yml
+    with:
+      contract-set: selftest/contracts.yaml
+      mode: enforce
+      baseline-refs: ${{ github.event.pull_request.base.sha || github.event.before }}
+      oasdiff-version: "1.33.0"
+      yq-version: "4.45.1"
+
+  crd:
+    uses: ./.github/workflows/provider-crd-check.yml
+    with:
+      crd-glob: selftest/crd/*.yaml
+      mode: enforce
+      baseline-refs: ${{ github.event.pull_request.base.sha || github.event.before }}
+
+  coverage:
+    uses: ./.github/workflows/provider-coverage-check.yml
+    with:
+      contract-set: selftest/contracts.yaml
+      crd-globs: selftest/crd/*.yaml
+      mode: enforce
+      yq-version: "4.45.1"

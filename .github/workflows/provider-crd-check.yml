@@ -28,27 +28,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Require a pinned reusable-workflow ref
-        env:
-          WORKFLOW_REF: ${{ job.workflow_ref }}
-          WORKFLOW_SHA: ${{ job.workflow_sha }}
-        run: |
-          set -euo pipefail
-          # job.workflow_sha is always the resolved commit, even when the caller wrote a
-          # branch or tag, so it cannot show how the caller pinned. job.workflow_ref ends
-          # with the ref the caller wrote after '@'; require a full commit SHA there.
-          pinned="${WORKFLOW_REF##*@}"
-          if [[ ! "$pinned" =~ ^[0-9a-f]{40}$ || "$pinned" != "$WORKFLOW_SHA" ]]; then
-            echo "::error::Call this workflow by a full commit SHA, not a branch or tag: $WORKFLOW_REF"
-            exit 2
-          fi
-
       - name: Check out contract-tests
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
           path: .contract-tests
+
+      # Callers must pin this workflow by full commit SHA; see require_pinned_ref in steps.py.
+      - name: Require a pinned reusable-workflow ref
+        env:
+          WORKFLOW_REF: ${{ job.workflow_ref }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          CALLER_REPOSITORY: ${{ github.repository }}
+        run: python3 .contract-tests/cmd/workflow-steps/steps.py require-pinned-ref
 
       - name: Set up Python
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
@@ -63,58 +57,12 @@ jobs:
           CRD_GLOB: ${{ inputs.crd-glob }}
           MODE: ${{ inputs.mode }}
           BASELINE_REFS: ${{ inputs.baseline-refs }}
-        run: |
-          set -euo pipefail
-          [[ "$MODE" == "report" || "$MODE" == "enforce" ]] || { echo "mode must be report or enforce" >&2; exit 2; }
-          read -r -a refs <<< "$BASELINE_REFS"
-          args=(--repo "$PWD" --crd-glob "$CRD_GLOB" --output-dir "$PWD/.contract-report")
-          for ref in "${refs[@]}"; do
-            args+=(--baseline-ref "$ref")
-          done
-          if [[ "$MODE" == "enforce" ]]; then
-            args+=(--enforce)
-          fi
-          python3 .contract-tests/cmd/contract-tests/cli.py crd-check "${args[@]}"
+        run: python3 .contract-tests/cmd/workflow-steps/steps.py run crd
 
       - name: Summarize compatibility result
         if: always()
         working-directory: ${{ github.workspace }}
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          report_path = Path(".contract-report/report.json")
-          if not report_path.is_file():
-              print("::error::CRD compatibility check did not produce report.json")
-              raise SystemExit(1)
-
-          report = json.loads(report_path.read_text())
-          status = report.get("status", "error")
-          mode = report.get("mode", "unknown mode")
-          finding_count = sum(len(baseline.get("findings", [])) for baseline in report.get("baselines", []))
-          print(f"## CRD compatibility: {report.get('crd_glob', 'unknown glob')}")
-          print()
-          print(f"- **Mode:** {mode}")
-          print(f"- **Result:** {status}")
-          print(f"- **Findings:** {finding_count}")
-
-          if status == "breaking":
-              message = f"CRD compatibility: {status} ({mode}); {finding_count} breaking findings. Download the contract-report artifact for details."
-              if mode == "report-only":
-                  print(f"::warning::{message}")
-              else:
-                  print(f"::error::{message}")
-              for baseline in report.get("baselines", []):
-                  for item in baseline.get("findings", []):
-                      print(f"- `{item.get('path', '')}` — {item.get('text', '')}")
-          elif status == "error":
-              errors = "; ".join(report.get("errors", [])) or "unknown error"
-              print(f"::error::CRD compatibility: {status} ({mode}); {errors}")
-          else:
-              print(f"::notice::CRD compatibility: {status} ({mode}); {finding_count} findings.")
-          PY
+        run: python3 .contract-tests/cmd/workflow-steps/steps.py summarize crd
 
       - name: Archive report
         if: always()

@@ -1,0 +1,34 @@
+openapi: 3.0.3
+info:
+  title: Self-test widgets API
+  version: 1.0.0
+  description: Fixture for the workflow self-test; see selftest/README.md.
+paths:
+  /api/widgets/v1/widgets:
+    get:
+      operationId: listWidgets
+      summary: List widgets
+      responses:
+        "200":
+          description: The widgets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WidgetList"
+components:
+  schemas:
+    Widget:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        size:
+          type: integer
+    WidgetList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Widget"
