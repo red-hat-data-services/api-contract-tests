@@ -161,10 +161,42 @@ class TestCRDCompatChecker:
 
     def test_new_crd_next_to_existing_ones_is_compatible(self):
         extra = self.repo / "config/crd/another.yaml"
-        extra.write_text(BASE_CRD.replace("widgets", "gadgets").replace("Widget", "Gadget"), encoding="utf-8")
+        extra.write_text(BASE_CRD.replace("examples", "gadgets").replace("Example", "Gadget"), encoding="utf-8")
         result, report = self.check()
         assert result.returncode == 0, result.stdout + result.stderr
         assert report["status"] == "compatible"
+
+    def test_identical_copies_of_a_crd_are_accepted(self):
+        # Providers may ship the same CRD in several kustomize overlays.
+        copy = self.repo / "config/crd/example-copy.yaml"
+        copy.write_text(BASE_CRD, encoding="utf-8")
+        self.git("add", "config")
+        self.commit("ship a second, identical copy")
+        result, report = self.check(baseline=self.git("rev-parse", "HEAD").stdout.strip())
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["status"] == "compatible"
+
+    def test_divergent_copies_in_the_candidate_are_an_error(self):
+        # Without this, a breaking change in one copy could hide behind the other.
+        copy = self.repo / "config/crd/example-copy.yaml"
+        copy.write_text(BASE_CRD.replace("enum: [fast, slow]", "enum: [fast]"), encoding="utf-8")
+        result, report = self.check()
+        assert result.returncode == 2
+        assert report["status"] == "error"
+        error = "".join(report["errors"])
+        assert "demo.example.com/Example is defined differently" in error
+        assert "config/crd/example.yaml" in error and "config/crd/example-copy.yaml" in error
+
+    def test_divergent_copies_in_the_baseline_are_an_error(self):
+        copy = self.repo / "config/crd/example-copy.yaml"
+        copy.write_text(BASE_CRD.replace("enum: [fast, slow]", "enum: [fast]"), encoding="utf-8")
+        self.git("add", "config")
+        self.commit("diverging copy")
+        diverging = self.git("rev-parse", "HEAD").stdout.strip()
+        copy.write_text(BASE_CRD, encoding="utf-8")
+        result, report = self.check(baseline=diverging)
+        assert result.returncode == 2
+        assert f"{diverging}:config/crd/example-copy.yaml" in "".join(report["errors"])
 
     def test_glob_that_misses_the_baseline_crds_is_still_an_error(self):
         # The baseline has a CRD, just not where the glob looks: a configuration error.

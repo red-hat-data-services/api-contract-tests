@@ -127,24 +127,47 @@ def parse_crds(content, source):
     return crds
 
 
+def merge_crds(documents, sources, parsed, source):
+    """Add one file's CRDs, refusing a CRD that another matched file defines differently.
+
+    A provider may ship the same CRD in several places (for example one copy per
+    kustomize overlay). Identical copies are fine. Divergent copies would leave one of
+    them unchecked depending on file order, so they are a configuration error.
+    """
+    for key, document in parsed.items():
+        if key in documents:
+            if documents[key] != document:
+                group, kind = key
+                raise CheckError(
+                    f"CRD {group}/{kind} is defined differently in {sources[key]} and {source}; "
+                    "copies of a CRD must be identical, or the glob must select only one of them"
+                )
+            continue
+        documents[key] = document
+        sources[key] = source
+
+
 def load_candidate(repo, files):
     documents = {}
+    sources = {}
     records = []
     for path in files:
         content = path.read_bytes()
         relative = path.relative_to(repo).as_posix()
-        documents.update(parse_crds(content, relative))
+        merge_crds(documents, sources, parse_crds(content, relative), relative)
         records.append({"file": relative, "sha256": digest(content)})
     return documents, records
 
 
 def load_baseline(repo, ref, files):
     documents = {}
+    sources = {}
     records = []
     for path in files:
         content = git_file(repo, ref, path)
         relative = path.as_posix()
-        documents.update(parse_crds(content, f"{ref}:{relative}"))
+        source = f"{ref}:{relative}"
+        merge_crds(documents, sources, parse_crds(content, source), source)
         records.append({"file": relative, "sha256": digest(content)})
     return documents, records
 

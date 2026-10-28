@@ -54,6 +54,16 @@ compared. When the baseline has no CRD manifests at all, the check reports
 `status: new` and does not fail. If the baseline has CRD manifests but none match
 your glob, that is a configuration error and still fails.
 
+## The same CRD in several files
+
+A provider may ship one CRD in more than one place, for example a copy per
+kustomize overlay. Identical copies are accepted and compared once. If two files
+matched by the glob define the same CRD (same group and kind) differently, the
+check fails with a configuration error naming both files, because otherwise only
+one copy would be compared and a breaking change in the other could go unnoticed.
+Keep the copies identical (ideally generated from one source), or narrow the glob
+to one of them.
+
 ## Confirm every CRD is covered
 
 The glob decides which manifests are compared, so a CRD that moves or is added
