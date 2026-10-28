@@ -93,6 +93,13 @@ python3 -m pip install -r requirements-dev.txt
 OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests -v
 ```
 
+The runner and modules are type-checked with mypy (settings in `mypy.ini`). Each
+module directory has its own `checker.py`, so check one file at a time:
+
+```bash
+for file in cmd/contract-tests/cli.py modules/*/*.py; do python3 -m mypy "$file"; done
+```
+
 The test suite requires `oasdiff` v1.33.0 and `yq` v4.45.1:
 
 ```bash

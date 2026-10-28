@@ -12,14 +12,23 @@ import os
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
+from typing import Any
+
+# A generator block from the descriptor, for example {"adapter": "openapi.static", "source": ...}.
+GeneratorSpec = Mapping[str, Any]
+# repo, generator spec, yq executable, destination file.
+Adapter = Callable[[Path, GeneratorSpec, Path, Path], None]
 
 
 class AdapterError(Exception):
     """The candidate could not be generated from the declared source."""
 
 
-def _run(args, *, cwd, env=None):
+def _run(
+    args: Sequence[str | Path], *, cwd: Path, env: Mapping[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     try:
         result = subprocess.run(
             [str(arg) for arg in args], cwd=cwd, env=env,
@@ -32,7 +41,7 @@ def _run(args, *, cwd, env=None):
     return result
 
 
-def yq_merge(repo, spec, yq, destination):
+def yq_merge(repo: Path, spec: GeneratorSpec, yq: Path, destination: Path) -> None:
     """Bundle an OpenAPI document from declared source globs using a
     provider-owned shell script and yq (the pattern used by
     scripts/merge_catalog_specs.sh in opendatahub-io/model-registry).
@@ -54,7 +63,7 @@ def yq_merge(repo, spec, yq, destination):
         source_dir = Path(spec["sourceDir"])
         source = repo / source_dir
         target = workspace / source_dir
-        inputs = []
+        inputs: list[Path] = []
         for pattern in spec["sourceGlobs"]:
             matches = sorted(source.glob(pattern))
             if not matches:
@@ -75,7 +84,7 @@ def yq_merge(repo, spec, yq, destination):
         shutil.copyfile(generated, destination)
 
 
-def static(repo, spec, yq, destination):
+def static(repo: Path, spec: GeneratorSpec, yq: Path, destination: Path) -> None:
     """No generation step: the declared source is already the contract-first
     candidate (e.g. a hand-maintained OpenAPI document with no bundler or
     code-generation step). Still copied through the same path as every other
@@ -89,13 +98,13 @@ def static(repo, spec, yq, destination):
     shutil.copyfile(source, destination)
 
 
-REGISTRY = {
+REGISTRY: dict[str, Adapter] = {
     "openapi.bundle.yq-merge": yq_merge,
     "openapi.static": static,
 }
 
 
-def generate(name, repo, spec, yq, destination):
+def generate(name: str, repo: Path, spec: GeneratorSpec, yq: Path, destination: Path) -> None:
     adapter = REGISTRY.get(name)
     if adapter is None:
         raise AdapterError(f"Unregistered generator adapter {name!r}; allowed: {sorted(REGISTRY)}")

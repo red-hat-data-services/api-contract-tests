@@ -6,22 +6,32 @@ type changes, enum narrowing, default changes, served-version removal, and
 storage-version changes without requiring a Kubernetes cluster.
 """
 
+import argparse
 import fnmatch
 import hashlib
 import json
 import re
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import yaml
+
+# A CRD is identified by (spec.group, spec.names.kind); see merge_crds.
+CrdKey = tuple[str, str]
+# A parsed CustomResourceDefinition document.
+Crd = dict[str, Any]
+CrdMap = dict[CrdKey, Crd]
+Finding = dict[str, str]
 
 
 class CheckError(Exception):
     """The comparison could not be completed reliably."""
 
 
-def command(args, *, cwd, check=True):
+def command(args: Sequence[str | Path], *, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
     try:
         result = subprocess.run(
             [str(arg) for arg in args], cwd=cwd,
@@ -34,7 +44,7 @@ def command(args, *, cwd, check=True):
     return result
 
 
-def validate_baseline_ref(ref):
+def validate_baseline_ref(ref: str) -> None:
     if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", ref) is None:
         raise CheckError(
             f"Baseline revision {ref!r} must be a full 40- or 64-character Git SHA; "
@@ -42,7 +52,7 @@ def validate_baseline_ref(ref):
         )
 
 
-def resolve_commit(repo, ref):
+def resolve_commit(repo: Path, ref: str) -> str:
     result = command(
         ["git", "--no-replace-objects", "rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}"],
         cwd=repo, check=False,
@@ -53,11 +63,11 @@ def resolve_commit(repo, ref):
     return sha
 
 
-def digest(data):
+def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def candidate_files(repo, pattern):
+def candidate_files(repo: Path, pattern: str) -> list[Path]:
     files = sorted(
         path for path in repo.rglob("*")
         if path.is_file() and ".git" not in path.parts
@@ -68,7 +78,7 @@ def candidate_files(repo, pattern):
     return files
 
 
-def baseline_files(repo, ref, pattern):
+def baseline_files(repo: Path, ref: str, pattern: str) -> list[Path]:
     result = command(["git", "ls-tree", "-r", "--name-only", ref], cwd=repo)
     return sorted(
         Path(line) for line in result.stdout.splitlines()
@@ -76,7 +86,7 @@ def baseline_files(repo, ref, pattern):
     )
 
 
-def baseline_has_crds(repo, ref):
+def baseline_has_crds(repo: Path, ref: str) -> bool:
     """True when the baseline contains any CRD manifest, wherever it lives.
 
     Separates "this provider had no CRDs yet" (new, nothing to compare) from "the
@@ -96,18 +106,18 @@ def baseline_has_crds(repo, ref):
     return False
 
 
-def git_file(repo, ref, relative_path):
+def git_file(repo: Path, ref: str, relative_path: Path) -> bytes:
     result = command(["git", "show", f"{ref}:{relative_path.as_posix()}"], cwd=repo)
     return result.stdout.encode("utf-8")
 
 
-def parse_crds(content, source):
+def parse_crds(content: bytes, source: str) -> CrdMap:
     try:
         documents = list(yaml.safe_load_all(content))
     except yaml.YAMLError as error:
         raise CheckError(f"Cannot parse CRD YAML {source}: {error}") from error
 
-    crds = {}
+    crds: CrdMap = {}
     for index, document in enumerate(documents, start=1):
         if not isinstance(document, dict) or document.get("kind") != "CustomResourceDefinition":
             raise CheckError(f"{source} document {index} is not a CustomResourceDefinition")
@@ -127,7 +137,7 @@ def parse_crds(content, source):
     return crds
 
 
-def merge_crds(documents, sources, parsed, source):
+def merge_crds(documents: CrdMap, sources: dict[CrdKey, str], parsed: CrdMap, source: str) -> None:
     """Add one file's CRDs, refusing a CRD that another matched file defines differently.
 
     A provider may ship the same CRD in several places (for example one copy per
@@ -147,9 +157,9 @@ def merge_crds(documents, sources, parsed, source):
         sources[key] = source
 
 
-def load_candidate(repo, files):
-    documents = {}
-    sources = {}
+def load_candidate(repo: Path, files: list[Path]) -> tuple[CrdMap, list[dict[str, str]]]:
+    documents: CrdMap = {}
+    sources: dict[CrdKey, str] = {}
     records = []
     for path in files:
         content = path.read_bytes()
@@ -159,9 +169,9 @@ def load_candidate(repo, files):
     return documents, records
 
 
-def load_baseline(repo, ref, files):
-    documents = {}
-    sources = {}
+def load_baseline(repo: Path, ref: str, files: list[Path]) -> tuple[CrdMap, list[dict[str, str]]]:
+    documents: CrdMap = {}
+    sources: dict[CrdKey, str] = {}
     records = []
     for path in files:
         content = git_file(repo, ref, path)
@@ -172,11 +182,11 @@ def load_baseline(repo, ref, files):
     return documents, records
 
 
-def finding(identifier, path, text):
+def finding(identifier: str, path: str, text: str) -> Finding:
     return {"id": identifier, "path": path, "text": text, "severity": "error"}
 
 
-def compare_schema(path, baseline, candidate, findings):
+def compare_schema(path: str, baseline: Any, candidate: Any, findings: list[Finding]) -> None:
     if baseline is None:
         return
     if candidate is None:
@@ -235,7 +245,7 @@ def compare_schema(path, baseline, candidate, findings):
             )
 
 
-def compare_crd(key, baseline, candidate, findings):
+def compare_crd(key: CrdKey, baseline: Crd, candidate: Crd, findings: list[Finding]) -> None:
     group, kind = key
     label = f"{group}/{kind}"
     baseline_versions = {
@@ -268,8 +278,8 @@ def compare_crd(key, baseline, candidate, findings):
         )
 
 
-def compare(baseline, candidate):
-    findings = []
+def compare(baseline: CrdMap, candidate: CrdMap) -> list[Finding]:
+    findings: list[Finding] = []
     for key, baseline_crd in baseline.items():
         candidate_crd = candidate.get(key)
         if candidate_crd is None:
@@ -282,7 +292,7 @@ def compare(baseline, candidate):
     return findings
 
 
-def run_check(args):
+def run_check(args: argparse.Namespace) -> int:
     output = args.output_dir.resolve()
     try:
         output.mkdir(parents=True, exist_ok=False)
@@ -290,7 +300,7 @@ def run_check(args):
         print(f"Cannot create new output directory: {error}", file=sys.stderr)
         return 2
 
-    report = {
+    report: dict[str, Any] = {
         "status": "error",
         "mode": "enforce" if args.enforce else "report-only",
         "crd_glob": args.crd_glob,
@@ -345,13 +355,3 @@ def run_check(args):
     print(f"{label}: {report['status']} ({report['mode']}); report: {output / 'report.json'}")
     return code
 
-
-def build_parser():
-    parser = argparse.ArgumentParser(prog="contract-tests crd-check")
-    check = parser
-    check.add_argument("--repo", type=Path, required=True)
-    check.add_argument("--crd-glob", required=True)
-    check.add_argument("--baseline-ref", action="append", required=True)
-    check.add_argument("--output-dir", type=Path, required=True)
-    check.add_argument("--enforce", action="store_true")
-    return parser

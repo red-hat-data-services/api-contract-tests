@@ -19,20 +19,29 @@ Like the other modules it uses the repository's pinned ``yq`` to read the
 descriptor, so it adds no dependency beyond what the OpenAPI check already has.
 """
 
+import argparse
 import fnmatch
 import importlib.util
 import json
 import os
 import re
 import sys
+from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
+from types import ModuleType
+from typing import Any
 
 _HERE = Path(__file__).resolve().parent
 _OPENAPI_CHECKER = _HERE.parent / "openapi-compat" / "checker.py"
 
+# A parsed YAML or JSON mapping (the descriptor, a contract entry), or a report row.
+Document = dict[str, Any]
 
-def _load_openapi_checker():
+
+def _load_openapi_checker() -> ModuleType:
     spec = importlib.util.spec_from_file_location("openapi_compat_checker", _OPENAPI_CHECKER)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load {_OPENAPI_CHECKER}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -54,7 +63,7 @@ YAML_CRD_GROUP = re.compile(r"^\s+group\s*:\s*\S", re.MULTILINE)
 YAML_CRD_NAMES = re.compile(r"^\s+names\s*:", re.MULTILINE)
 
 
-def repo_files(repo):
+def repo_files(repo: Path) -> list[str]:
     """Repo-relative paths of tracked files plus untracked, non-ignored ones.
 
     Including untracked files lets a developer run the check before
@@ -67,7 +76,7 @@ def repo_files(repo):
     return [name for name in names if (repo / name).is_file()]
 
 
-def _read_text(repo, relative):
+def _read_text(repo: Path, relative: str) -> str | None:
     path = repo / relative
     if path.suffix.lower() not in SPEC_EXTENSIONS or path.stat().st_size > MAX_BYTES:
         return None
@@ -77,7 +86,7 @@ def _read_text(repo, relative):
         return None
 
 
-def is_openapi_document(relative, text):
+def is_openapi_document(relative: str, text: str | None) -> bool:
     """True when the file's top level declares an ``openapi`` or ``swagger`` version."""
     if text is None:
         return False
@@ -92,7 +101,7 @@ def is_openapi_document(relative, text):
     return YAML_OPENAPI.search(text) is not None
 
 
-def is_crd_manifest(relative, text):
+def is_crd_manifest(relative: str, text: str | None) -> bool:
     return (
         text is not None and Path(relative).suffix.lower() in {".yaml", ".yml"}
         and YAML_CRD.search(text) is not None
@@ -100,9 +109,10 @@ def is_crd_manifest(relative, text):
     )
 
 
-def discover_documents(repo):
+def discover_documents(repo: Path) -> tuple[list[str], list[str]]:
     """Return (openapi_documents, crd_manifests) as sorted repo-relative paths."""
-    documents, crds = [], []
+    documents: list[str] = []
+    crds: list[str] = []
     for relative in repo_files(repo):
         text = _read_text(repo, relative)
         if is_openapi_document(relative, text):
@@ -112,14 +122,14 @@ def discover_documents(repo):
     return documents, crds
 
 
-def normalize(relative, what):
+def normalize(relative: str, what: str) -> str:
     cleaned = PurePosixPath(os.path.normpath(str(relative)))
     if cleaned.is_absolute() or ".." in cleaned.parts:
         raise CheckError(f"{what} {relative!r} must be a repo-relative path without '..'")
     return cleaned.as_posix()
 
 
-def load_exclusions(descriptor):
+def load_exclusions(descriptor: Document) -> list[dict[str, str]]:
     exclusions = descriptor.get("spec", {}).get("exclusions", [])
     if not isinstance(exclusions, list):
         raise CheckError("spec.exclusions must be a list of {path, reason} entries")
@@ -137,13 +147,14 @@ def load_exclusions(descriptor):
     return parsed
 
 
-def generator_for(contract, descriptor):
+def generator_for(contract: Document, descriptor: Document) -> Document:
     return contract.get("generator") or descriptor.get("spec", {}).get("candidate", {}).get("generator") or {}
 
 
-def generator_inputs(repo, generator):
+def generator_inputs(repo: Path, generator: Document) -> tuple[set[str], list[str]]:
     """Repo-relative inputs of a generator and a list of dangling references."""
-    inputs, dangling = set(), []
+    inputs: set[str] = set()
+    dangling: list[str] = []
     adapter = generator.get("adapter")
     if adapter == "openapi.static":
         source = generator.get("source")
@@ -167,15 +178,20 @@ def generator_inputs(repo, generator):
     return inputs, dangling
 
 
-def classify_openapi(repo, descriptor, documents):
+def classify_openapi(
+    repo: Path, descriptor: Document, documents: list[str],
+) -> tuple[list[Document], list[str], list[str], list[tuple[str, str, str]]]:
     """Account for every discovered document against the descriptor."""
     exclusions = load_exclusions(descriptor)
     contracts = descriptor.get("spec", {}).get("contracts", [])
     if not isinstance(contracts, list) or not contracts:
         raise CheckError("Descriptor declares no contracts")
 
-    owners, sources, problems, warnings = {}, {}, [], []
-    scope = []
+    owners: dict[str, str] = {}
+    sources: dict[str, str] = {}
+    problems: list[str] = []
+    warnings: list[str] = []
+    scope: list[tuple[str, str, str]] = []
     for contract in contracts:
         contract_id = contract.get("id", "<unnamed>") if isinstance(contract, dict) else "<invalid>"
         if not isinstance(contract, dict):
@@ -200,7 +216,8 @@ def classify_openapi(repo, descriptor, documents):
         for path in inputs:
             sources.setdefault(path, contract_id)
 
-    rows, used = [], set()
+    rows: list[Document] = []
+    used: set[str] = set()
     for path in documents:
         matched = next((item for item in exclusions if fnmatch.fnmatch(path, item["path"])), None)
         if path in owners:
@@ -227,7 +244,9 @@ def classify_openapi(repo, descriptor, documents):
     return rows, problems, warnings, scope
 
 
-def baseline_overview(repo, descriptor, default_refs):
+def baseline_overview(
+    repo: Path, descriptor: Document, default_refs: Sequence[str],
+) -> tuple[list[Document], list[str]]:
     """List per-contract baselines and flag any newer than the repository default.
 
     A per-contract baseline that is newer than the default, or keeps fewer of the
@@ -237,7 +256,8 @@ def baseline_overview(repo, descriptor, default_refs):
     """
     spec = descriptor.get("spec", {})
     default = list(default_refs) or ((spec.get("baseline") or {}).get("refs") or [])
-    rows, warnings = [], []
+    rows: list[Document] = []
+    warnings: list[str] = []
     for contract in spec.get("contracts", []):
         block = contract.get("baseline") if isinstance(contract, dict) else None
         if block is None:
@@ -279,14 +299,14 @@ def baseline_overview(repo, descriptor, default_refs):
     return rows, warnings
 
 
-def _is_ancestor(repo, older, newer):
+def _is_ancestor(repo: Path, older: str, newer: str) -> bool:
     result = openapi.command(["git", "--no-replace-objects", "merge-base", "--is-ancestor", older, newer], cwd=repo, check=False)
     if result.returncode not in (0, 1):
         raise CheckError("unresolved")
     return result.returncode == 0
 
 
-def _relation(repo, refs, default):
+def _relation(repo: Path, refs: list[str], default: list[str]) -> str:
     try:
         if set(refs) == set(default):
             return "same"
@@ -302,15 +322,20 @@ def _relation(repo, refs, default):
         return "unresolved"
 
 
-def classify_crds(crds, globs, excludes=()):
+def classify_crds(
+    crds: list[str], globs: Sequence[str], excludes: Sequence[str] = (),
+) -> tuple[list[Document], list[str], list[str]]:
     """Match CRD manifests against the globs the CRD check uses.
 
     A manifest the check's globs match is covered. One it does not match is
     uncovered unless an explicit --crd-exclude glob names it (for example mocked
     CRDs used as test data).
     """
-    rows, problems, warnings = [], [], []
-    matched_globs, used_excludes = set(), set()
+    rows: list[Document] = []
+    problems: list[str] = []
+    warnings: list[str] = []
+    matched_globs: set[str] = set()
+    used_excludes: set[str] = set()
     for path in crds:
         # Record every pattern that matches, not just the first: overlapping globs are
         # legitimate, and a pattern shadowed by an earlier one is not "matching nothing".
@@ -334,14 +359,14 @@ def classify_crds(crds, globs, excludes=()):
     return rows, problems, warnings
 
 
-def load_document(yq, repo, relative):
+def load_document(yq: Path, repo: Path, relative: str) -> Any:
     path = repo / relative
     if path.suffix.lower() == ".json":
         return json.loads(path.read_text(encoding="utf-8"))
     return json.loads(openapi.command([yq, "eval", "-o=json", ".", str(path)], cwd=repo).stdout)
 
 
-def path_scope(yq, repo, contract_id, artifact, match_path):
+def path_scope(yq: Path, repo: Path, contract_id: str, artifact: str, match_path: str) -> Document:
     """How many of the artifact's API paths a contract's matchPath leaves unchecked."""
     parsed = load_document(yq, repo, artifact)
     names = sorted(parsed.get("paths") or {}) if isinstance(parsed, dict) else []
@@ -359,12 +384,12 @@ def path_scope(yq, repo, contract_id, artifact, match_path):
 VERSION_SEGMENT = re.compile(r"v\d+((alpha|beta)\d+)?")
 
 
-def common_prefix(names):
+def common_prefix(names: Sequence[str]) -> str:
     """Longest shared path prefix, cut after the API version segment when there is one."""
     split = [name.strip("/").split("/") for name in names]
     if not split:
         return ""
-    prefix = []
+    prefix: list[str] = []
     for parts in zip(*split):
         if len(set(parts)) != 1:
             break
@@ -374,7 +399,7 @@ def common_prefix(names):
     return "/" + "/".join(prefix) if prefix else ""
 
 
-def describe(yq, repo, relative, documents):
+def describe(yq: Path, repo: Path, relative: str, documents: set[str]) -> Document:
     """Suggest a contract shape for one discovered document (a hint, not a decision)."""
     parsed = load_document(yq, repo, relative)
     info = parsed.get("info") or {} if isinstance(parsed, dict) else {}
@@ -388,7 +413,7 @@ def describe(yq, repo, relative, documents):
         kind = "source"
     else:
         kind = "standalone"
-    record = {
+    record: Document = {
         "path": relative, "kind": kind, "title": info.get("title"), "version": info.get("version"),
         "paths": len(names), "path_prefix": prefix,
         "suggested_match_path": f"^{re.escape(prefix)}(/|$)" if prefix else ".*",
@@ -403,7 +428,7 @@ def describe(yq, repo, relative, documents):
     return record
 
 
-def bundler_script_candidates(repo, files):
+def bundler_script_candidates(repo: Path, files: list[str]) -> list[str]:
     """Shell scripts that mention both openapi and yq, likely bundlers."""
     found = []
     for relative in files:
@@ -415,7 +440,7 @@ def bundler_script_candidates(repo, files):
     return found
 
 
-def _read_text_any(repo, relative):
+def _read_text_any(repo: Path, relative: str) -> str | None:
     try:
         path = repo / relative
         if path.stat().st_size > MAX_BYTES:
@@ -425,7 +450,7 @@ def _read_text_any(repo, relative):
         return None
 
 
-def render_coverage(report):
+def render_coverage(report: Document) -> str:
     lines = [f"Coverage of {report['repo']} against {report['contract_set']}"]
     labels = {"contract": "contract", "source": "source", "excluded": "excluded",
               "uncovered": "UNCOVERED", "covered": "covered"}
@@ -473,9 +498,9 @@ def render_coverage(report):
     return "\n".join(lines)
 
 
-def run_coverage(args):
+def run_coverage(args: argparse.Namespace) -> int:
     repo = args.repo.resolve()
-    report = {
+    report: Document = {
         "status": "error", "repo": str(repo), "contract_set": str(args.contract_set),
         "openapi": [], "crds": [], "crd_manifests_found": 0, "path_scope": [], "baselines": [],
         "problems": [], "warnings": [], "errors": [],
@@ -528,7 +553,7 @@ def run_coverage(args):
     return code
 
 
-def run_discover(args):
+def run_discover(args: argparse.Namespace) -> int:
     repo = args.repo.resolve()
     try:
         yq = openapi.tool_path("yq", args.yq, repo)
