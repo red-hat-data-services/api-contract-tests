@@ -94,6 +94,9 @@ def main(argv=None):
                           help="The repository default baseline (full Git SHA); used only to flag per-contract "
                                "baselines that are newer than it")
     coverage.add_argument("--format", choices=("text", "json"), default="text")
+    coverage.add_argument("--json-output", type=Path,
+                          help="Also write the JSON report to this file, whatever --format prints "
+                               "(the reusable workflow reads it to annotate gaps on the pull request)")
     coverage.add_argument("--report-only", action="store_true",
                           help="Exit 0 even when gaps are found; integrity errors still exit 2")
     coverage.add_argument("--yq", default=os.environ.get("YQ"), help="Repository's pinned yq executable")

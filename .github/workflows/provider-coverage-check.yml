@@ -119,4 +119,34 @@ jobs:
           if [[ "$MODE" == "report" ]]; then
             args+=(--report-only)
           fi
+          # The JSON copy stays outside the checkout so it is never scanned as a repository file.
+          args+=(--json-output "$RUNNER_TEMP/coverage.json")
           python3 .contract-tests/cmd/contract-tests/cli.py coverage "${args[@]}" | tee "$GITHUB_STEP_SUMMARY"
+
+      - name: Annotate coverage gaps
+        if: always()
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          def escape(text):
+              # Workflow-command data must not carry raw %, CR or LF.
+              return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+          report_path = Path(os.environ["RUNNER_TEMP"]) / "coverage.json"
+          if not report_path.is_file():
+              print("::error title=API contract coverage::The coverage check did not produce a report")
+              raise SystemExit(0)
+
+          report = json.loads(report_path.read_text())
+          # Report mode keeps the job green, so a warning is the only signal on the pull request.
+          level = "error" if os.environ.get("MODE") == "enforce" else "warning"
+          for text in report.get("problems", []):
+              print(f"::{level} title=API contract coverage gap::{escape(text)}")
+          for text in report.get("errors", []):
+              print(f"::error title=API contract coverage error::{escape(text)}")
+          PY

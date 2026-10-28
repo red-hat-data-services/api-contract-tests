@@ -180,6 +180,9 @@ exclusions. For each contract it reports how many API paths fall outside
 scope visible to reviewers. Add `--format json` for machine-readable output,
 `--report-only` to see gaps without failing, and `--crd-glob` (repeatable) to
 require that every CRD manifest is matched by the glob your CRD check uses. Overlapping globs are fine; each pattern only has to match something.
+`--json-output <file>` also writes the JSON report to a file whatever `--format`
+prints; the reusable coverage workflow uses it to annotate each gap on the pull
+request, as a warning in report mode and as an error in enforce mode.
 
 ## 5. Add CI
 
