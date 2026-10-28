@@ -49,4 +49,27 @@ jobs:
           YQ: ${{ github.workspace }}/bin/yq
         run: |
           python3 -m compileall cmd modules
-          python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests -v
+          python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests cmd/action-pins/tests -v
+
+  workflow-lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: "1.26"
+
+      - name: Install pinned actionlint
+        run: GOBIN="$PWD/bin" go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+      # actionlint also runs the runner's shellcheck on every run: script.
+      - name: Lint workflows
+        run: bin/actionlint
+
+      - name: Check action pins against their version comments
+        run: python3 cmd/action-pins/check_action_pins.py

@@ -90,7 +90,17 @@ policy and the remaining cluster-backed follow-on work.
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
-OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests -v
+OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests cmd/action-pins/tests -v
+```
+
+CI also lints the workflows with [actionlint](https://github.com/rhysd/actionlint)
+v1.7.12 (settings in `.github/actionlint.yaml`) and checks that every action's
+pinned SHA is the commit its `# vX.Y.Z` comment names:
+
+```bash
+GOBIN="$PWD/bin" go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+bin/actionlint
+python3 cmd/action-pins/check_action_pins.py
 ```
 
 The runner and modules are type-checked with mypy (settings in `mypy.ini`). Each
