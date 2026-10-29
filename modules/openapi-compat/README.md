@@ -24,7 +24,7 @@ A provider registers one or more contracts in a `ContractSet` descriptor
 (conventionally `.rhoai/contracts.yaml` in the provider repository) and runs:
 
 ```bash
-python3 <path-to-contract-tests>/cmd/contract-tests/cli.py check \
+python3 <path-to-api-contract-tests>/cmd/contract-tests/cli.py check \
   --repo . \
   --contract-set .rhoai/contracts.yaml \
   --baseline-ref <full-git-sha> \

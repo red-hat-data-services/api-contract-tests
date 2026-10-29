@@ -34,11 +34,30 @@ def test_provider_pinned_by_sha_passes():
     assert steps.require_pinned_ref(pinned_env(SHA)) == (0, "")
 
 
-@pytest.mark.parametrize("ref", ["main", "v1.0.0", "refs/heads/main", SHA[:12]])
-def test_provider_pinned_by_branch_or_tag_fails(ref):
+@pytest.mark.parametrize("ref", ["v0.1.0", "refs/tags/v0.1.0", "v12.0.3", "refs/tags/v1.10.0"])
+def test_provider_pinned_by_version_tag_passes(ref):
+    code, message = steps.require_pinned_ref(pinned_env(ref))
+    assert code == 0
+    tag = ref.removeprefix("refs/tags/")
+    assert message == f"::notice::Pinned to release tag {tag} (commit {SHA})"
+
+
+@pytest.mark.parametrize("ref", ["stable", "latest", "refs/tags/stable", "refs/tags/latest"])
+def test_provider_pinned_by_floating_tag_passes_and_records_the_commit(ref):
+    code, message = steps.require_pinned_ref(pinned_env(ref))
+    assert code == 0
+    assert message.startswith("::notice::Pinned to floating tag ")
+    assert message.endswith(f"this run used commit {SHA}")
+
+
+@pytest.mark.parametrize("ref", [
+    "main", "refs/heads/main", "refs/heads/v1.0.0", "refs/heads/stable", SHA[:12],
+    "v1", "v1.2", "v1.2.3-rc.1", "1.2.3", "v01.2.3", "refs/tags/v1", "refs/tags/release", "Stable",
+])
+def test_provider_pinned_by_branch_or_other_ref_fails(ref):
     code, message = steps.require_pinned_ref(pinned_env(ref))
     assert code == 2
-    assert message.startswith("::error::Call this workflow by a full commit SHA")
+    assert message.startswith("::error::Call this workflow by a full commit SHA, a release tag (vX.Y.Z)")
 
 
 def test_sha_that_is_not_the_running_commit_fails():

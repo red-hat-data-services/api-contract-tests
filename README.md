@@ -16,7 +16,9 @@ this repository supplies the shared checks and result format.
   repository is registered; `discover` inventories a repository for onboarding.
 - The local runner is `cmd/contract-tests/cli.py`.
 - Provider onboarding is opt-in and starts in report mode; see
-  [`docs/onboarding`](docs/onboarding/README.md). Check each provider
+  [`docs/onboarding`](docs/onboarding/README.md). Providers pin the reusable
+  workflows to a release tag (`@v0.1.0`), `@stable`, `@latest` or a full commit
+  SHA; see [releases and pinning](docs/releasing.md). Check each provider
   repository's workflow for whether it has been wired in yet.
 - CRD conversion, stored-object migration, and consumer-reliance checks are follow-on work.
 
@@ -25,7 +27,7 @@ this repository supplies the shared checks and result format.
 From a provider repository with a `.rhoai/contracts.yaml` descriptor:
 
 ```bash
-python3 /path/to/contract-tests/cmd/contract-tests/cli.py check \
+python3 /path/to/api-contract-tests/cmd/contract-tests/cli.py check \
   --repo . \
   --contract-set .rhoai/contracts.yaml \
   --baseline-ref <full-git-sha> \
@@ -53,7 +55,7 @@ and CRDs and suggests a contract for each.
 For a provider with committed CRD manifests:
 
 ```bash
-python3 /path/to/contract-tests/cmd/contract-tests/cli.py crd-check \
+python3 /path/to/api-contract-tests/cmd/contract-tests/cli.py crd-check \
   --repo . \
   --crd-glob 'config/crd/**/*.yaml' \
   --baseline-ref <full-git-sha> \
@@ -76,6 +78,7 @@ policy and the remaining cluster-backed follow-on work.
 ├── docs/
 │   ├── architecture.md       # Ownership and enforcement model
 │   ├── onboarding/           # Provider onboarding checklist and guides
+│   ├── releasing.md          # Pinning options and the release process
 │   └── research/             # CRD and follow-on research
 └── .github/workflows/        # CI and provider workflows
 ```

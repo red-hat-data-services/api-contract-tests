@@ -187,8 +187,10 @@ request, as a warning in report mode and as an error in enforce mode.
 ## 5. Add CI
 
 Call the reusable workflows from a provider workflow, for example
-`.github/workflows/api-contract.yml`. Always reference them by a full commit
-SHA; never by `main` or a tag. Start in `report` mode.
+`.github/workflows/api-contract.yml`. Reference them by a release tag
+(`@v0.1.0`), by `@stable` or `@latest`, or by a full commit SHA; never by `main`
+or another branch. [Releases and pinning](../releasing.md) explains which to
+choose. Start in `report` mode.
 
 ```yaml
 name: API contract
@@ -206,7 +208,7 @@ jobs:
       fail-fast: false
       matrix:
         contract-id: [your-service-v1, your-service-v1alpha3]
-    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-openapi-check.yml@<full-git-sha>
+    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-openapi-check.yml@v0.1.0
     with:
       contract-set: .rhoai/contracts.yaml
       contract-id: ${{ matrix.contract-id }}
@@ -216,7 +218,7 @@ jobs:
       mode: report
 
   api-contract-coverage:
-    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-coverage-check.yml@<full-git-sha>
+    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-coverage-check.yml@v0.1.0
     with:
       contract-set: .rhoai/contracts.yaml
       baseline-refs: <full-git-sha>   # optional: lets coverage flag per-contract baselines that loosen the default
@@ -227,9 +229,9 @@ jobs:
 Omit `contract-id` and the matrix when the descriptor registers exactly one
 contract. Each contract uploads its own `contract-report-<id>` artifact.
 
-The workflows validate their own reusable-workflow ref, install exact tool
+The workflows reject a branch or unknown tag as their own reusable-workflow ref, install exact tool
 versions, and reject mutable baseline refs. A change to `baseline-refs`, to the
-pinned workflow SHA, or to the descriptor changes what the check protects, so
+pinned workflow ref, or to the descriptor changes what the check protects, so
 require an owner's review for those files (see the
 [checklist](README.md#checklist), step 7).
 

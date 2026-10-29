@@ -31,6 +31,9 @@ from typing import Any, TextIO
 
 CLI = Path(__file__).resolve().parents[1] / "contract-tests" / "cli.py"
 FULL_SHA = re.compile(r"[0-9a-f]{40}")
+# Release tags a caller may pin the provider workflows to; see docs/releasing.md.
+VERSION_TAG = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
+FLOATING_TAGS = ("stable", "latest")
 REPORT = Path(".contract-report") / "report.json"
 
 Runner = Callable[..., "subprocess.CompletedProcess[str]"]
@@ -50,12 +53,33 @@ def command(level: str, message: str, title: str | None = None) -> str:
     return f"::{level}{properties}::{escape(message)}"
 
 
+def release_tag(ref: str) -> str | None:
+    """The tag name if ref names a release tag this repository publishes, else None.
+
+    Accepts the full form (refs/tags/v1.2.3) and the bare name (v1.2.3), because the
+    caller's spelling is what reaches job.workflow_ref. Only release names are
+    accepted, so a branch never passes: refs/heads/... is never a tag, and a bare
+    name is accepted only if it is one this repository reserves for tags.
+    """
+    name = ref.removeprefix("refs/tags/")
+    if VERSION_TAG.fullmatch(name) or name in FLOATING_TAGS:
+        return name
+    return None
+
+
 def require_pinned_ref(env: Mapping[str, str]) -> tuple[int, str]:
-    """Require callers to name this workflow by a full commit SHA.
+    """Require callers to name this workflow by a full commit SHA or a release tag.
 
     job.workflow_sha is always the resolved commit, even when the caller wrote a
     branch or tag, so it cannot show how the caller pinned. job.workflow_ref ends
-    with the ref the caller wrote after '@'; require a full commit SHA there.
+    with the ref the caller wrote after '@'. Accepted there:
+
+    - a full commit SHA, which must be the commit that is running;
+    - a version tag, vX.Y.Z, which the release process never moves;
+    - a floating tag (stable, latest), which the release process moves on purpose.
+
+    Branches, short SHAs and any other tag fail. For a tag, the notice records the
+    commit it resolved to, so a run can be traced to the exact code it used.
 
     The exception is this repository calling its own workflows with
     ``uses: ./.github/workflows/...`` (the self-test). A local call has no SHA to
@@ -63,13 +87,23 @@ def require_pinned_ref(env: Mapping[str, str]) -> tuple[int, str]:
     a different repository, so it can never match.
     """
     workflow_ref = env.get("WORKFLOW_REF", "")
+    workflow_sha = env.get("WORKFLOW_SHA", "")
     workflow_repository = env.get("WORKFLOW_REPOSITORY", "")
     if workflow_repository and workflow_repository == env.get("CALLER_REPOSITORY"):
         return 0, command("notice", f"{workflow_repository} is calling its own workflow; pinning is not required: {workflow_ref}")
     pinned = workflow_ref.rpartition("@")[2]
-    if FULL_SHA.fullmatch(pinned) is None or pinned != env.get("WORKFLOW_SHA"):
-        return 2, command("error", f"Call this workflow by a full commit SHA, not a branch or tag: {workflow_ref}")
-    return 0, ""
+    if FULL_SHA.fullmatch(pinned) and pinned == workflow_sha:
+        return 0, ""
+    tag = release_tag(pinned)
+    if tag in FLOATING_TAGS:
+        return 0, command("notice", f"Pinned to floating tag {tag}, which moves with each release; this run used commit {workflow_sha}")
+    if tag:
+        return 0, command("notice", f"Pinned to release tag {tag} (commit {workflow_sha})")
+    return 2, command(
+        "error",
+        f"Call this workflow by a full commit SHA, a release tag (vX.Y.Z) or a floating tag "
+        f"({', '.join(FLOATING_TAGS)}), not a branch or other ref: {workflow_ref}",
+    )
 
 
 def _mode(env: Mapping[str, str]) -> str:

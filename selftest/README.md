@@ -19,4 +19,5 @@ baseline expectations in the same pull request.
 A local call has no SHA to pin, so the workflows' pin requirement is waived when
 the caller is this repository (see `require_pinned_ref` in
 `cmd/workflow-steps/steps.py`). Providers are different repositories and must
-still pin by full commit SHA.
+still pin by full commit SHA or release tag (see
+[releases and pinning](../docs/releasing.md)).

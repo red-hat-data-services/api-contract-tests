@@ -56,8 +56,10 @@ repository supplies the runner, schemas, and reusable workflows.
    newer than the default. Fix gaps by registering the document or excluding
    it. Never by deleting the check.
 
-6. **Add the workflow** in report mode, pinned to a full commit SHA of this
-   repository. See [Adding CI](openapi-compat.md#5-add-ci).
+6. **Add the workflow** in report mode, pinned to a release of this
+   repository, for example `@v0.1.0`. See [Adding CI](openapi-compat.md#5-add-ci)
+   and [releases and pinning](../releasing.md) for the choices (version tag,
+   `stable`, `latest` or a full commit SHA).
 
 7. **Protect the configuration.** The descriptor, the workflow, and the
    baseline commit are what keep the check honest. Make them code-owned (for

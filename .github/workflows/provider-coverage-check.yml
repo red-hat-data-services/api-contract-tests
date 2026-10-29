@@ -59,7 +59,7 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .contract-tests
 
-      # Callers must pin this workflow by full commit SHA; see require_pinned_ref in steps.py.
+      # Callers must pin this workflow by full commit SHA or release tag; see require_pinned_ref in steps.py.
       - name: Require a pinned reusable-workflow ref
         env:
           WORKFLOW_REF: ${{ job.workflow_ref }}
