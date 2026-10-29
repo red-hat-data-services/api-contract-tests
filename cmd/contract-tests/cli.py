@@ -20,35 +20,37 @@ import argparse
 import importlib.util
 import os
 import sys
+from collections.abc import Sequence
 from pathlib import Path
+from types import ModuleType
 
 _CHECKER_PATH = Path(__file__).resolve().parents[2] / "modules" / "openapi-compat" / "checker.py"
 _CRD_CHECKER_PATH = Path(__file__).resolve().parents[2] / "modules" / "crd-compat" / "checker.py"
 _COVERAGE_PATH = Path(__file__).resolve().parents[2] / "modules" / "coverage" / "checker.py"
 
 
-def _load_checker():
-    spec = importlib.util.spec_from_file_location("openapi_compat_checker", _CHECKER_PATH)
+def _load_module(name: str, path: Path) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load {path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-def _load_crd_checker():
-    spec = importlib.util.spec_from_file_location("crd_compat_checker", _CRD_CHECKER_PATH)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def _load_checker() -> ModuleType:
+    return _load_module("openapi_compat_checker", _CHECKER_PATH)
 
 
-def _load_coverage():
-    spec = importlib.util.spec_from_file_location("coverage_checker", _COVERAGE_PATH)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def _load_crd_checker() -> ModuleType:
+    return _load_module("crd_compat_checker", _CRD_CHECKER_PATH)
 
 
-def main(argv=None):
+def _load_coverage() -> ModuleType:
+    return _load_module("coverage_checker", _COVERAGE_PATH)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="contract-tests", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -109,17 +111,19 @@ def main(argv=None):
     discover.add_argument("--yq", default=os.environ.get("YQ"), help="Pinned yq executable")
 
     args = parser.parse_args(argv)
+    # The checker modules are loaded at runtime, so their return values are untyped here.
+    code: int
     if args.command == "coverage":
-        return _load_coverage().run_coverage(args)
-    if args.command == "discover":
-        return _load_coverage().run_discover(args)
-    if args.command == "check":
-        checker = _load_checker()
-        return checker.run_check(args)
-    if args.command == "crd-check":
-        checker = _load_crd_checker()
-        return checker.run_check(args)
-    parser.error(f"Unknown command {args.command!r}")
+        code = _load_coverage().run_coverage(args)
+    elif args.command == "discover":
+        code = _load_coverage().run_discover(args)
+    elif args.command == "check":
+        code = _load_checker().run_check(args)
+    elif args.command == "crd-check":
+        code = _load_crd_checker().run_check(args)
+    else:
+        parser.error(f"Unknown command {args.command!r}")
+    return code
 
 
 if __name__ == "__main__":

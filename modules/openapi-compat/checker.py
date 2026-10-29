@@ -10,6 +10,7 @@ versions, or bundling scripts live here. All of that comes from the
 provider's own .rhoai/contracts.yaml.
 """
 
+import argparse
 import hashlib
 import importlib.util
 import json
@@ -18,13 +19,21 @@ import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from types import ModuleType
+from typing import Any
 
 _HERE = Path(__file__).resolve().parent
 
+# A parsed YAML or JSON mapping: a descriptor, a contract entry, or the report.
+Document = dict[str, Any]
 
-def _load_adapters():
+
+def _load_adapters() -> ModuleType:
     spec = importlib.util.spec_from_file_location("openapi_compat_adapters", _HERE / "adapters.py")
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load {_HERE / 'adapters.py'}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -37,7 +46,9 @@ class CheckError(Exception):
     """The comparison could not be completed reliably."""
 
 
-def command(args, *, cwd, env=None, check=True):
+def command(
+    args: Sequence[str | Path], *, cwd: Path, env: Mapping[str, str] | None = None, check: bool = True,
+) -> subprocess.CompletedProcess[str]:
     try:
         result = subprocess.run(
             [str(arg) for arg in args], cwd=cwd, env=env,
@@ -50,7 +61,8 @@ def command(args, *, cwd, env=None, check=True):
     return result
 
 
-def tool_path(name, explicit, repo):
+def tool_path(name: str, explicit: str | None, repo: Path) -> Path:
+    candidate: str | Path | None
     if explicit:
         candidate = shutil.which(explicit) or explicit
     elif (repo / "bin" / name).is_file():
@@ -62,7 +74,7 @@ def tool_path(name, explicit, repo):
     return Path(candidate).resolve()
 
 
-def verify_oasdiff(binary, version, cwd):
+def verify_oasdiff(binary: Path, version: str, cwd: Path) -> str:
     output = command([binary, "--version"], cwd=cwd).stdout.strip()
     if output in (f"oasdiff version {version}", f"oasdiff version v{version}"):
         return output
@@ -76,7 +88,7 @@ def verify_oasdiff(binary, version, cwd):
     raise CheckError(f"Expected oasdiff v{version}, got {output!r}")
 
 
-def verify_yq(binary, version, cwd):
+def verify_yq(binary: Path, version: str, cwd: Path) -> str:
     output = command([binary, "--version"], cwd=cwd).stdout.strip()
     if re.search(rf"(?:^|\s)version v{re.escape(version)}(?:\s|$)", output):
         return output
@@ -88,7 +100,7 @@ def verify_yq(binary, version, cwd):
     raise CheckError(f"Expected yq v{version}, got {output!r}")
 
 
-def validate_baseline_ref(ref):
+def validate_baseline_ref(ref: str) -> None:
     if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", ref) is None:
         raise CheckError(
             f"Baseline revision {ref!r} must be a full 40- or 64-character Git SHA; "
@@ -96,7 +108,7 @@ def validate_baseline_ref(ref):
         )
 
 
-def resolve_commit(repo, ref):
+def resolve_commit(repo: Path, ref: str) -> str:
     result = command(
         ["git", "--no-replace-objects", "rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}"],
         cwd=repo, check=False,
@@ -107,11 +119,11 @@ def resolve_commit(repo, ref):
     return sha
 
 
-def digest(path):
+def digest(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def spec_has_paths(yq, path, cwd, pattern):
+def spec_has_paths(yq: Path, path: Path, cwd: Path, pattern: str) -> bool:
     parsed = json.loads(command([yq, "eval", "-o=json", ".", str(path)], cwd=cwd).stdout)
     paths = parsed.get("paths") if isinstance(parsed, dict) else None
     return isinstance(paths, dict) and any(
@@ -119,7 +131,7 @@ def spec_has_paths(yq, path, cwd, pattern):
     )
 
 
-def findings(result, operation):
+def findings(result: subprocess.CompletedProcess[str], operation: str) -> list[Document]:
     try:
         parsed = json.loads(result.stdout)
     except json.JSONDecodeError as error:
@@ -137,7 +149,7 @@ def findings(result, operation):
     return parsed
 
 
-def validate_spec(binary, policy, path, cwd):
+def validate_spec(binary: Path, policy: Path, path: Path, cwd: Path) -> list[Document]:
     result = command(
         [binary, "validate", "--config", policy, "--allow-external-refs=false",
          "--fail-on", "ERR", "--format", "json", path], cwd=cwd, check=False,
@@ -148,7 +160,7 @@ def validate_spec(binary, policy, path, cwd):
     return records
 
 
-def load_descriptor(path, yq, cwd):
+def load_descriptor(path: Path, yq: Path, cwd: Path) -> Document:
     if not Path(path).is_file():
         raise CheckError(f"Descriptor not found: {path}")
     raw = command([yq, "eval", "-o=json", ".", str(path)], cwd=cwd).stdout
@@ -161,7 +173,7 @@ def load_descriptor(path, yq, cwd):
     return data
 
 
-def select_contract(descriptor, contract_id):
+def select_contract(descriptor: Document, contract_id: str | None) -> Document:
     contracts = descriptor.get("spec", {}).get("contracts", [])
     if not isinstance(contracts, list) or not contracts:
         raise CheckError("Descriptor declares no contracts")
@@ -175,7 +187,9 @@ def select_contract(descriptor, contract_id):
     return matches[0]
 
 
-def contract_baselines(args, descriptor, contract):
+def contract_baselines(
+    args: argparse.Namespace, descriptor: Document, contract: Document,
+) -> tuple[list[tuple[str, str]], str | None, bool]:
     """Resolve which baselines a contract is compared against, and where they came from.
 
     Precedence: the contract's own ``baseline`` block, then ``--baseline-ref`` (the
@@ -211,12 +225,14 @@ def contract_baselines(args, descriptor, contract):
     )
 
 
-def exists_at(repo, sha, relative):
+def exists_at(repo: Path, sha: str, relative: str) -> bool:
     result = command(["git", "--no-replace-objects", "cat-file", "-e", f"{sha}:{relative}"], cwd=repo, check=False)
     return result.returncode == 0
 
 
-def find_moved_artifact(repo, sha, match_path, yq, workdir, skip):
+def find_moved_artifact(
+    repo: Path, sha: str, match_path: str | None, yq: Path, workdir: Path, skip: str,
+) -> tuple[str | None, bool]:
     """Find an OpenAPI document at the baseline that may be this contract's earlier self.
 
     Used when the declared artifact is absent: if the API existed under another
@@ -239,7 +255,7 @@ def find_moved_artifact(repo, sha, match_path, yq, workdir, skip):
         relative = line[len(prefix):] if line.startswith(prefix) else line
         if relative == skip:
             continue
-        if catch_all:
+        if catch_all or match_path is None:
             return relative, True
         probe = Path(workdir) / "moved-probe.yaml"
         raw = command(["git", "--no-replace-objects", "show", f"{sha}:{relative}"], cwd=repo, check=False)
@@ -254,7 +270,7 @@ def find_moved_artifact(repo, sha, match_path, yq, workdir, skip):
     return None, False
 
 
-def check_compatibility(args, output, report):
+def check_compatibility(args: argparse.Namespace, output: Path, report: Document) -> int:
     repo = args.repo.resolve()
     oasdiff = tool_path("oasdiff", args.oasdiff, repo)
     yq = tool_path("yq", args.yq, repo)
@@ -358,7 +374,7 @@ def check_compatibility(args, output, report):
     breaking = False
     compared = [baseline for baseline in report["baselines"] if baseline["status"] == "compared"]
     for baseline in compared:
-        cmd = [oasdiff, "breaking", "--config", policy_file, "--allow-external-refs=false",
+        cmd: list[str | Path] = [oasdiff, "breaking", "--config", policy_file, "--allow-external-refs=false",
                "--severity-levels", levels_file]
         if flatten_allof:
             cmd.append("--flatten-allof")
@@ -377,14 +393,14 @@ def check_compatibility(args, output, report):
     return 1 if breaking and args.enforce else 0
 
 
-def run_check(args):
+def run_check(args: argparse.Namespace) -> int:
     output = args.output_dir.resolve()
     try:
         output.mkdir(parents=True, exist_ok=False)
     except OSError as error:
         print(f"Cannot create new output directory: {error}", file=sys.stderr)
         return 2
-    report = {
+    report: Document = {
         "status": "error", "mode": "enforce" if args.enforce else "report-only",
         "contract_set": str(args.contract_set), "baselines": [], "errors": [],
     }

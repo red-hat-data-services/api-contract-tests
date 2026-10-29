@@ -1,2 +1,4 @@
+mypy==2.4.0
 pytest==8.3.3
 PyYAML==6.0.3
+types-PyYAML==6.0.12.20260906
