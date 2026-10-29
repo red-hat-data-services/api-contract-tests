@@ -1,0 +1,17 @@
+# Fixture ContractSet for the workflow self-test; see selftest/README.md.
+apiVersion: contracts.rhoai.io/v1alpha1
+kind: ContractSet
+metadata:
+  name: selftest
+spec:
+  contracts:
+    - id: selftest-widgets-v1
+      type: openapi
+      declaredArtifact: selftest/openapi/widgets.yaml
+      matchPath: "^/api/widgets/v1(/|$)"
+      policy:
+        oasdiffVersion: "1.33.0"
+        yqVersion: "4.45.1"
+      generator:
+        adapter: openapi.static
+        source: selftest/openapi/widgets.yaml

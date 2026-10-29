@@ -1,0 +1,7 @@
+paths:
+  .github/workflows/**/*.{yml,yaml}:
+    ignore:
+      # GitHub documents job.workflow_ref, workflow_sha, workflow_repository and
+      # workflow_file_path, but actionlint v1.7.12 does not know them yet
+      # (rhysd/actionlint#705, fix pending in #707). Drop this once a release has it.
+      - 'property "workflow_(ref|sha|repository|file_path)" is not defined in object type'

@@ -44,27 +44,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Require a pinned reusable-workflow ref
-        env:
-          WORKFLOW_REF: ${{ job.workflow_ref }}
-          WORKFLOW_SHA: ${{ job.workflow_sha }}
-        run: |
-          set -euo pipefail
-          # job.workflow_sha is always the resolved commit, even when the caller wrote a
-          # branch or tag, so it cannot show how the caller pinned. job.workflow_ref ends
-          # with the ref the caller wrote after '@'; require a full commit SHA there.
-          pinned="${WORKFLOW_REF##*@}"
-          if [[ ! "$pinned" =~ ^[0-9a-f]{40}$ || "$pinned" != "$WORKFLOW_SHA" ]]; then
-            echo "::error::Call this workflow by a full commit SHA, not a branch or tag: $WORKFLOW_REF"
-            exit 2
-          fi
-
       - name: Check out contract-tests
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
           path: .contract-tests
+
+      # Callers must pin this workflow by full commit SHA; see require_pinned_ref in steps.py.
+      - name: Require a pinned reusable-workflow ref
+        env:
+          WORKFLOW_REF: ${{ job.workflow_ref }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          CALLER_REPOSITORY: ${{ github.repository }}
+        run: python3 .contract-tests/cmd/workflow-steps/steps.py require-pinned-ref
 
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -91,89 +85,12 @@ jobs:
           BASELINE_REFS: ${{ inputs.baseline-refs }}
           OASDIFF: ${{ github.workspace }}/bin/oasdiff
           YQ: ${{ github.workspace }}/bin/yq
-        run: |
-          set -euo pipefail
-          [[ "$MODE" == "report" || "$MODE" == "enforce" ]] || { echo "mode must be report or enforce" >&2; exit 2; }
-          read -r -a refs <<< "$BASELINE_REFS"
-          args=(--repo "$PWD" --contract-set "$CONTRACT_SET" --output-dir "$PWD/.contract-report")
-          if [[ -n "$CONTRACT_ID" ]]; then
-            args+=(--contract-id "$CONTRACT_ID")
-          fi
-          for ref in "${refs[@]}"; do
-            if [[ ! "$ref" =~ ^[0-9a-f]{40}$ ]]; then
-              echo "Baseline refs must be full 40-character Git SHAs: $ref" >&2
-              exit 2
-            fi
-            args+=(--baseline-ref "$ref")
-          done
-          if [[ "$MODE" == "enforce" ]]; then
-            args+=(--enforce)
-          fi
-          python3 .contract-tests/cmd/contract-tests/cli.py check "${args[@]}"
+        run: python3 .contract-tests/cmd/workflow-steps/steps.py run openapi
 
       - name: Summarize compatibility result
         if: always()
         working-directory: ${{ github.workspace }}
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          report_path = Path(".contract-report/report.json")
-          if not report_path.is_file():
-              print("::error::Compatibility check did not produce report.json")
-              raise SystemExit(1)
-
-          report = json.loads(report_path.read_text())
-          label = report.get("contract_id", report.get("contract_set", "unknown contract"))
-          mode = report.get("mode", "unknown mode")
-          status = report.get("status", "error")
-          baselines = report.get("baselines", [])
-          finding_count = sum(len(baseline.get("findings", [])) for baseline in baselines)
-
-          print(f"## OpenAPI compatibility: {label}")
-          print()
-          print(f"- **Mode:** {mode}")
-          print(f"- **Result:** {status}")
-          print(f"- **Findings:** {finding_count}")
-          print()
-          print("| Baseline | Source | Compatible | Findings |")
-          print("| --- | --- | --- | --- |")
-          for baseline in baselines:
-              if baseline.get("status") == "new":
-                  compatible = "new (not in baseline)"
-              else:
-                  compatible = "yes" if baseline.get("compatible") else "no"
-              baseline_findings = len(baseline.get("findings", []))
-              print(f"| `{baseline.get('sha', 'unknown')}` | {baseline.get('source', 'default')} | {compatible} | {baseline_findings} |")
-          if status == "new":
-              print()
-              print("This API does not exist at any baseline yet, so nothing was compared. "
-                    "It becomes protected once a baseline that contains it is adopted.")
-
-          if status == "breaking":
-              message = f"{label}: {status} ({mode}); {finding_count} breaking findings. Download the contract-report artifact for details."
-              if mode == "report-only":
-                  print(f"::warning::{message}")
-              else:
-                  print(f"::error::{message}")
-
-              print()
-              print("### Breaking findings")
-              print()
-              for baseline in baselines:
-                  for finding in baseline.get("findings", []):
-                      text = finding.get("text", "").replace("|", "\\|")
-                      path = finding.get("path", "")
-                      operation = finding.get("operation", "")
-                      print(f"- `{operation} {path}` — {text}")
-          elif status == "error":
-              errors = "; ".join(report.get("errors", [])) or "unknown error"
-              print(f"::error::{label}: {status} ({mode}); {errors}")
-          else:
-              print(f"::notice::{label}: {status} ({mode}); {finding_count} findings.")
-          PY
+        run: python3 .contract-tests/cmd/workflow-steps/steps.py summarize openapi
 
       - name: Archive report
         if: always()

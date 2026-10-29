@@ -52,27 +52,21 @@ jobs:
           # Full history: comparing a per-contract baseline with the default needs the commits.
           fetch-depth: 0
 
-      - name: Require a pinned reusable-workflow ref
-        env:
-          WORKFLOW_REF: ${{ job.workflow_ref }}
-          WORKFLOW_SHA: ${{ job.workflow_sha }}
-        run: |
-          set -euo pipefail
-          # job.workflow_sha is always the resolved commit, even when the caller wrote a
-          # branch or tag, so it cannot show how the caller pinned. job.workflow_ref ends
-          # with the ref the caller wrote after '@'; require a full commit SHA there.
-          pinned="${WORKFLOW_REF##*@}"
-          if [[ ! "$pinned" =~ ^[0-9a-f]{40}$ || "$pinned" != "$WORKFLOW_SHA" ]]; then
-            echo "::error::Call this workflow by a full commit SHA, not a branch or tag: $WORKFLOW_REF"
-            exit 2
-          fi
-
       - name: Check out api-contract-tests
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
           path: .contract-tests
+
+      # Callers must pin this workflow by full commit SHA; see require_pinned_ref in steps.py.
+      - name: Require a pinned reusable-workflow ref
+        env:
+          WORKFLOW_REF: ${{ job.workflow_ref }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          CALLER_REPOSITORY: ${{ github.repository }}
+        run: python3 .contract-tests/cmd/workflow-steps/steps.py require-pinned-ref
 
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -95,58 +89,10 @@ jobs:
           BASELINE_REFS: ${{ inputs.baseline-refs }}
           MODE: ${{ inputs.mode }}
           YQ: ${{ github.workspace }}/bin/yq
-        run: |
-          set -euo pipefail
-          [[ "$MODE" == "report" || "$MODE" == "enforce" ]] || { echo "mode must be report or enforce" >&2; exit 2; }
-          args=(--repo "$PWD" --contract-set "$CONTRACT_SET")
-          # Globs are expanded by the checker, never by the shell.
-          set -f
-          for glob in $CRD_GLOBS; do
-            args+=(--crd-glob "$glob")
-          done
-          for glob in $CRD_EXCLUDE_GLOBS; do
-            args+=(--crd-exclude "$glob")
-          done
-          set +f
-          read -r -a refs <<< "$BASELINE_REFS"
-          for ref in "${refs[@]}"; do
-            if [[ ! "$ref" =~ ^[0-9a-f]{40}$ ]]; then
-              echo "Baseline refs must be full 40-character Git SHAs: $ref" >&2
-              exit 2
-            fi
-            args+=(--baseline-ref "$ref")
-          done
-          if [[ "$MODE" == "report" ]]; then
-            args+=(--report-only)
-          fi
-          # The JSON copy stays outside the checkout so it is never scanned as a repository file.
-          args+=(--json-output "$RUNNER_TEMP/coverage.json")
-          python3 .contract-tests/cmd/contract-tests/cli.py coverage "${args[@]}" | tee "$GITHUB_STEP_SUMMARY"
+        run: python3 .contract-tests/cmd/workflow-steps/steps.py run coverage
 
       - name: Annotate coverage gaps
         if: always()
         env:
           MODE: ${{ inputs.mode }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          def escape(text):
-              # Workflow-command data must not carry raw %, CR or LF.
-              return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-
-          report_path = Path(os.environ["RUNNER_TEMP"]) / "coverage.json"
-          if not report_path.is_file():
-              print("::error title=API contract coverage::The coverage check did not produce a report")
-              raise SystemExit(0)
-
-          report = json.loads(report_path.read_text())
-          # Report mode keeps the job green, so a warning is the only signal on the pull request.
-          level = "error" if os.environ.get("MODE") == "enforce" else "warning"
-          for text in report.get("problems", []):
-              print(f"::{level} title=API contract coverage gap::{escape(text)}")
-          for text in report.get("errors", []):
-              print(f"::error title=API contract coverage error::{escape(text)}")
-          PY
+        run: python3 .contract-tests/cmd/workflow-steps/steps.py annotate-coverage

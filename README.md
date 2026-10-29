@@ -90,7 +90,17 @@ policy and the remaining cluster-backed follow-on work.
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
-OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests -v
+OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests cmd/action-pins/tests cmd/workflow-steps/tests -v
+```
+
+CI also lints the workflows with [actionlint](https://github.com/rhysd/actionlint)
+v1.7.12 (settings in `.github/actionlint.yaml`) and checks that every action's
+pinned SHA is the commit its `# vX.Y.Z` comment names:
+
+```bash
+GOBIN="$PWD/bin" go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+bin/actionlint
+python3 cmd/action-pins/check_action_pins.py
 ```
 
 The runner and modules are type-checked with mypy (settings in `mypy.ini`). Each
@@ -99,6 +109,12 @@ module directory has its own `checker.py`, so check one file at a time:
 ```bash
 for file in cmd/contract-tests/cli.py modules/*/*.py; do python3 -m mypy "$file"; done
 ```
+
+The provider workflows keep their logic in `cmd/workflow-steps/steps.py`
+(tested by `cmd/workflow-steps/tests`); the YAML only wires steps together. The
+`Workflow self-test` workflow (`.github/workflows/self-test.yml`) runs all three
+provider workflows end to end on every pull request, against the fixture provider
+in [`selftest/`](selftest/README.md).
 
 The test suite requires `oasdiff` v1.33.0 and `yq` v4.45.1:
 
