@@ -48,18 +48,24 @@ user in plain words before you ask for it:
 
 Suggest the baseline in this order, and always let the user confirm it:
 
-1. **The commit the RHOAI 3.6 release was based on.** Look on the trusted remote
-   for the 3.6 GA release tag or the head of the 3.6 release branch. Names vary
-   (`odh-v3.6.0`, `odh-3.6.0`, `v3.6.0`, `release/odh-3.6.0`, `rhoai-3.6`); use
-   `git tag --list '*3.6*'` and `git branch -r --list '*3.6*'`. Prefer the GA tag
-   over EA and RC tags. Resolve it to a full SHA with
-   `git rev-parse '<tag>^{commit}'` or
-   `git rev-parse refs/remotes/<trusted-remote>/<branch>`, and show the user the
-   SHA, the tag or branch it came from, and the commit subject and date. If there
-   are several candidates, list them and ask; do not pick one silently.
+1. **The commit the RHOAI 3.6 release was based on.** Do not search for tags: the
+   downstream `red-hat-data-services` repositories have no 3.6 tags, only a
+   `rhoai-3.6` branch, and its head is a downstream-only commit that does not exist
+   in the `opendatahub-io` repository the check runs in, so it would fail there. The
+   baseline is the newest commit both repositories share (the merge base of
+   `rhoai-3.6` and the default branch). Get it with
+   `python3 $ACT/cmd/release-baseline/release_baseline.py lookup --release 3.6 --repo <org>/<repo>`,
+   which reads `$ACT/data/release-baselines/3.6.json` and needs no network. If the
+   repository is not listed, or the user wants to verify or refresh the value, run
+   `resolve` instead of `lookup` (GitHub API; set `GITHUB_TOKEN` or log in with
+   `gh`). Add `--image <release image>` to take the release commit from the image's
+   source-commit label instead of the branch head. Show the user the baseline SHA,
+   the release commit it was derived from and the data file's `generated` date, and
+   ask them to confirm.
 2. **Otherwise, the current head of `main`** (the repository's default branch):
    `git rev-parse refs/remotes/<trusted-remote>/main`. Use this when the
-   repository has no 3.6 release commit or the user cannot confirm one. Tell the
+   `lookup` and `resolve` report no baseline (for example a repository with no
+   downstream counterpart or no shared history) or the user cannot confirm one. Tell the
    user what it means: everything on `main` today is treated as released and
    protected from now on, earlier releases are not compared, and anything already
    broken on `main` is accepted.
@@ -72,8 +78,9 @@ Rules that apply either way:
 - Use the same SHA everywhere the repository default is set: the workflow's
   `baseline-refs` input, `--baseline-ref` in local runs, and `spec.baseline.refs`
   if the descriptor carries one.
-- Next to the setting, record the SHA's source (the tag or branch name, or
-  "`main` on <date>") in a comment so a reviewer can verify it.
+- Next to the setting, record the SHA's source (for example "merge base of
+  rhoai-3.6 and main, from release_baseline.py on <date>", or "`main` on <date>")
+  in a comment so a reviewer can verify it.
 
 The same guidance is in `$ACT/docs/onboarding/README.md` (Choosing a baseline); keep
 the two consistent.

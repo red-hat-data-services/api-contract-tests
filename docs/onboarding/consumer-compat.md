@@ -53,9 +53,11 @@ unnoticed.
 
 Choose it as the checklist describes in
 [Choosing a baseline](README.md#choosing-a-baseline), applied to the provider
-repository: the provider commit the RHOAI 3.6 release was based on, or the full SHA
-that the provider's `main` resolves to today when there is none. If the provider's
-descriptor already declares a baseline, compare it with your choice.
+repository: the provider commit the RHOAI 3.6 release was based on (from
+`release_baseline.py lookup --release 3.6 --repo <org>/<provider-repo>`), or the
+full SHA that the provider's `main` resolves to today when the tool reports no
+baseline. If the provider's descriptor already declares a baseline, compare it with
+your choice.
 
 Use a full SHA for the recorded baseline and for evidence attached to a review.
 Testing against the provider's `main` is useful as a drift signal, but it is not

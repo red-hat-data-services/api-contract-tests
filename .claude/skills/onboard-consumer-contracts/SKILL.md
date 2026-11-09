@@ -48,18 +48,24 @@ it to the user in plain words before you ask for it:
 
 Suggest the baseline in this order, and always let the user confirm it:
 
-1. **The provider commit the RHOAI 3.6 release was based on.** Look in the
-   provider repository, on the trusted remote, for the 3.6 GA release tag or the
-   head of the 3.6 release branch. Names vary (`odh-v3.6.0`, `odh-3.6.0`,
-   `v3.6.0`, `release/odh-3.6.0`, `rhoai-3.6`); use `git tag --list '*3.6*'` and
-   `git branch -r --list '*3.6*'`. Prefer the GA tag over EA and RC tags. Resolve
-   it to a full SHA with `git rev-parse '<tag>^{commit}'` or
-   `git rev-parse refs/remotes/<trusted-remote>/<branch>`, and show the user the
-   SHA, the tag or branch it came from, and the commit subject and date. If there
-   are several candidates, list them and ask; do not pick one silently.
+1. **The provider commit the RHOAI 3.6 release was based on.** Do not search for
+   tags: the downstream `red-hat-data-services` repositories have no 3.6 tags, only
+   a `rhoai-3.6` branch, and its head is a downstream-only commit that does not
+   exist in the `opendatahub-io` provider repository. The baseline is the newest
+   commit both repositories share (the merge base of `rhoai-3.6` and the provider's
+   default branch). Get it with
+   `python3 $ACT/cmd/release-baseline/release_baseline.py lookup --release 3.6 --repo <org>/<provider-repo>`,
+   which reads `$ACT/data/release-baselines/3.6.json` and needs no network. If the
+   provider is not listed, or the user wants to verify or refresh the value, run
+   `resolve` instead of `lookup` (GitHub API; set `GITHUB_TOKEN` or log in with
+   `gh`). Add `--image <release image>` to take the release commit from the image's
+   source-commit label instead of the branch head. Show the user the baseline SHA,
+   the release commit it was derived from and the data file's `generated` date, and
+   ask them to confirm.
 2. **Otherwise, the current head of the provider's `main`** (its default branch):
    `git rev-parse refs/remotes/<trusted-remote>/main`. Use this when the provider
-   has no 3.6 release commit or the user cannot confirm one. Tell the user what it
+   `lookup` and `resolve` report no baseline (for example a provider with no
+   downstream counterpart or no shared history) or the user cannot confirm one. Tell the user what it
    means: the provider as it is today is treated as the version the consumer
    relies on, earlier releases are not covered, and the drift run in step 5 only
    shows provider changes made after this SHA.
@@ -73,8 +79,9 @@ Rules that apply either way:
   or an unpushed local branch. Never write `main`, a branch, a tag or `HEAD`.
 - Use the same SHA in the reliance profile and in the pinned provider checkout the
   tests run against (step 5), and wherever the CI workflow pins the provider version.
-- Next to the setting, record the SHA's source (the tag or branch name, or
-  "`main` on <date>") in a comment so a reviewer can verify it.
+- Next to the setting, record the SHA's source (for example "merge base of
+  rhoai-3.6 and main, from release_baseline.py on <date>", or "`main` on <date>")
+  in a comment so a reviewer can verify it.
 
 The same guidance is in `$ACT/docs/onboarding/README.md` (Choosing a baseline) and
 `$ACT/docs/onboarding/consumer-compat.md` (Choosing the provider reference); keep

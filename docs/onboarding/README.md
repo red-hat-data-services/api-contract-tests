@@ -136,13 +136,19 @@ may still change.
 
 **Which commit to use.** Pick the first that applies:
 
-1. The commit the RHOAI 3.6 release was based on: the commit of the 3.6 GA release
-   tag, or the head of the 3.6 release branch, on the trusted remote. Names vary
-   by repository (`odh-v3.6.0`, `odh-3.6.0`, `v3.6.0`, `release/odh-3.6.0`,
-   `rhoai-3.6`); `git tag --list '*3.6*'` and `git branch -r --list '*3.6*'` find
-   them. Prefer the GA tag over EA and RC tags, and resolve it to a full SHA with
-   `git rev-parse '<tag>^{commit}'`.
-2. Otherwise, the SHA that `main` (the default branch) resolves to today:
+1. The commit the RHOAI 3.6 release was based on. The downstream repositories
+   (`red-hat-data-services/*`) have no 3.6 tags, only a `rhoai-3.6` branch, and that
+   branch's head is a downstream-only commit: in the 68 repositories where the two
+   histories can be compared, it does not exist in the `opendatahub-io` repository
+   the check runs in, so it cannot be a baseline there. Use the newest commit both
+   repositories share (the merge base of `rhoai-3.6` and the default branch).
+   [`release_baseline.py`](../../cmd/release-baseline/README.md) computes it:
+   `lookup --release 3.6 --repo <org>/<repo>` reads the checked-in
+   [`data/release-baselines/3.6.json`](../../data/release-baselines/3.6.json)
+   without network access, and `resolve` recomputes it from GitHub.
+2. Otherwise, when the tool reports no baseline (for example a repository with no
+   downstream counterpart or no shared history), the SHA that `main` (the default
+   branch) resolves to today:
    `git rev-parse refs/remotes/<trusted-remote>/main`. Everything on `main` is then
    treated as released and protected from now on, earlier releases are not
    compared, and anything already broken on `main` is accepted.
@@ -151,8 +157,9 @@ This is the recommended default, not a rule: a repository that must protect a
 different supported release can use it, and should record the reason. Whichever you
 choose:
 
-- record the SHA's source (the tag or branch name, or "`main` on <date>") in a
-  comment next to the setting, so a reviewer can verify it;
+- record the SHA's source (for example "merge base of rhoai-3.6 and main, from
+  release_baseline.py on <date>", or "`main` on <date>") in a comment next to the
+  setting, so a reviewer can verify it;
 - use the same SHA everywhere the repository default is set: the workflow's
   `baseline-refs`, `--baseline-ref` in local runs, and `spec.baseline.refs` if the
   descriptor carries one;

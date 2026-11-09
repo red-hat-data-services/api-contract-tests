@@ -43,8 +43,9 @@ provider and consumers agree on the policy.
 
 ```bash
 # Preferred: the commit the RHOAI 3.6 release was based on
-baseline_sha=$(git rev-parse '<3.6-release-tag>^{commit}')
-# Fallback when there is no 3.6 release commit: the SHA main resolves to today
+baseline_sha=$(python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/release-baseline/release_baseline.py \
+  lookup --release 3.6 --repo <org>/<repo> --format sha)
+# Fallback when the tool reports no baseline: the SHA main resolves to today
 # baseline_sha=$(git rev-parse refs/remotes/<trusted-remote>/main)
 python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/contract-tests/cli.py crd-check \
   --repo . \
