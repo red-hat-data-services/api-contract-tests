@@ -9,8 +9,8 @@ python3 cmd/contract-tests/cli.py check \
   --repo /path/to/provider/checkout \
   --contract-set .rhoai/contracts.yaml \
   --baseline-ref <full-git-sha> \
-  --output-dir /tmp/contract-report \
-  [--contract-id <id>] [--enforce] [--oasdiff <path>] [--yq <path>]
+  --output-dir /tmp/contract-report --enforce \
+  [--contract-id <id>] [--oasdiff <path>] [--yq <path>]
 ```
 
 `--baseline-ref` is the repository default and is optional when the descriptor
@@ -20,6 +20,9 @@ at a default baseline is reported as `new`, not a failure. Use the commit the RH
 none; see
 [`docs/onboarding`](../../docs/onboarding/README.md#choosing-a-baseline) for why it
 matters.
+
+Pass `--enforce` in CI and in local runs that should match CI. Without it, `check` and
+`crd-check` record findings and exit 0 (report mode, not recommended).
 
 The same command runs locally and in CI — there is no separate "CI mode" —
 so a result is always reproducible without a cluster. See
@@ -33,7 +36,7 @@ python3 cmd/contract-tests/cli.py crd-check \
   --crd-glob 'config/crd/**/*.yaml' \
   --baseline-ref <full-git-sha> \
   --output-dir /tmp/crd-contract-report \
-  [--enforce]
+  --enforce
 ```
 
 See [`docs/onboarding/crd-compat.md`](../../docs/onboarding/crd-compat.md).

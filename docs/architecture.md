@@ -32,6 +32,8 @@ provider contracts.
 - **Report-only:** compatibility findings are recorded but do not fail the pull request.
 - **Enforce:** breaking findings fail the pull request.
 
+Enforce is the mode every provider should run; report-only is available but not recommended.
+
 Infrastructure and integrity failures fail closed in both modes. Missing
 baselines, digest mismatches, mutable baseline refs, malformed descriptors,
 unpinned tools, and missing required results must not produce a silent pass.

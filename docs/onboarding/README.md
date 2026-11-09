@@ -8,8 +8,9 @@ repository owns:
 | Provider | The canonical OpenAPI document or CRDs, provider behavior tests, and the `ContractSet` descriptor | [Provider checklist](#provider-checklist), then the [OpenAPI](openapi-compat.md) or [CRD](crd-compat.md) guide |
 | Consumer | The reliance profile, consumer-side contract tests, and the CI job that runs them | [Consumer guide](consumer-compat.md) and [Consumer checklist](#consumer-checklist) |
 
-Provider rollout is opt-in: nothing here is a promotion gate, and every check
-starts in report mode. Consumer reliance checks are repository-local today; the
+Provider rollout is opt-in: nothing here is a promotion gate, and every check runs
+in `mode: enforce`, so a pull request that breaks a registered contract fails the
+job. Consumer reliance checks are repository-local today; the
 consumer guide records the profile and tests that the follow-on shared verifier
 will adopt.
 
@@ -48,8 +49,8 @@ repository supplies the runner, schemas, and reusable workflows.
    [OpenAPI guide](openapi-compat.md#2-write-a-contractset-descriptor). One
    descriptor can hold several contracts.
 
-4. **Run the checks locally** with the pinned tools and the baseline you chose in
-   [Choosing a baseline](#choosing-a-baseline):
+4. **Run the checks locally** with the pinned tools, `--enforce`, and the baseline
+   you chose in [Choosing a baseline](#choosing-a-baseline):
    [OpenAPI](openapi-compat.md#4-run-it-locally) and, if you ship CRDs,
    [CRD](crd-compat.md#run-locally).
 
@@ -65,7 +66,7 @@ repository supplies the runner, schemas, and reusable workflows.
    newer than the default. Fix gaps by registering the document or excluding
    it. Never by deleting the check.
 
-6. **Add the workflow** in report mode, pinned to a release of this
+6. **Add the workflow** in `mode: enforce`, pinned to a release of this
    repository, for example `@v0.1.0`, with `baseline-refs` set to the baseline SHA
    you chose. See [Adding CI](openapi-compat.md#5-add-ci)
    and [releases and pinning](../releasing.md) for the choices (version tag,
@@ -108,9 +109,9 @@ repository supplies the runner, schemas, and reusable workflows.
    versions, and result. Run against provider `main` as a separate drift signal;
    do not record the name `main` as the baseline.
 
-6. **Add report-mode CI.** Run the consumer tests on consumer changes and
+6. **Add enforce-mode CI.** Run the consumer tests on consumer changes and
    provider syncs. Pin any reusable workflow to a release tag or full SHA, never
-   a branch. See [consumer CI](consumer-compat.md#6-add-ci-in-report-mode).
+   a branch. See [consumer CI](consumer-compat.md#6-add-ci-in-enforce-mode).
 
 7. **Register the relationship.** Provide the provider contract, consumer
    profile, test command, CI workflow, owners, support level, and known gaps to
@@ -203,13 +204,19 @@ newer than the default, keeps fewer of the default baselines (for example
 loosens protection for that contract. Pass the default as `baseline-refs` to the
 coverage workflow (and use a full checkout) so this works in CI.
 
-## Moving from report to enforce
+## Enforce mode
 
-Stay in report mode until the findings have been reviewed and the provider and
-its consumers agree on the policy. Then change `mode: report` to
-`mode: enforce` on the compatibility job and, separately, on the coverage job.
-Making a job required for merges is a branch-protection decision in your
-repository, not something this repository does for you.
+Every job runs in `mode: enforce` (`--enforce` on the command line): a pull request
+that breaks a registered contract fails the job, on the compatibility job and on the
+coverage job. Report mode (`mode: report`, or `check` without `--enforce`) records
+findings without failing and is not recommended.
+
+If the first run fails because the repository already broke its baseline, that is a
+finding, not a reason to use report mode. Fix the break or, for an OpenAPI contract
+whose break was intentional and agreed, record a per-contract `baseline` override
+with a `reason` (see [Choosing a baseline](#choosing-a-baseline)). Making a job
+required for merges is a branch-protection decision in your repository, not
+something this repository does for you.
 
 ## Using an assistant
 
@@ -222,6 +229,6 @@ Two assistant skills encode these paths:
 - `.claude/skills/onboard-consumer-contracts/SKILL.md` covers the consumer path.
   It inventories reliance from code and tests, proposes the provider baseline the
   same way, drafts the profile, verifies the consumer tests, and prepares
-  report-mode CI.
+  enforce-mode CI.
 
 Both skills stop before pushing or opening a pull request unless you ask.

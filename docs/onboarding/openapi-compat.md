@@ -121,16 +121,17 @@ python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/contract-tests/cl
   --repo . \
   --contract-set .rhoai/contracts.yaml \
   --baseline-ref "$baseline_sha" \
+  --enforce \
   --output-dir /tmp/contract-report
 ```
 
 Repeat `--baseline-ref` for every applicable supported-release baseline;
 every supplied baseline is compared independently. Never pass `main`,
-`HEAD`, or an unresolved ref — only full, resolved Git SHAs. Add `--enforce`
-once report-only evidence and owner agreement support gating merges.
+`HEAD`, or an unresolved ref — only full, resolved Git SHAs. `--enforce` makes a
+breaking finding fail the run; it is what the workflows' `mode: enforce` does.
 
-Read `report.json.status`, not just the exit code: report-only mode exits
-`0` even when breaking findings are recorded.
+Read `report.json.status`, not just the exit code: without `--enforce` (report mode,
+not recommended) the exit code is `0` even when breaking findings are recorded.
 
 ### Baselines
 
@@ -200,7 +201,7 @@ Call the reusable workflows from a provider workflow, for example
 `.github/workflows/api-contract.yml`. Reference them by a release tag
 (`@v0.1.0`), by `@stable` or `@latest`, or by a full commit SHA; never by `main`
 or another branch. [Releases and pinning](../releasing.md) explains which to
-choose. Start in `report` mode.
+choose. Use `mode: enforce`.
 
 ```yaml
 name: API contract
@@ -225,7 +226,7 @@ jobs:
       baseline-refs: <full-git-sha>   # optional if the descriptor declares baselines
       oasdiff-version: "1.33.0"
       yq-version: "4.45.1"
-      mode: report
+      mode: enforce
 
   api-contract-coverage:
     uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-coverage-check.yml@v0.1.0
@@ -233,7 +234,7 @@ jobs:
       contract-set: .rhoai/contracts.yaml
       baseline-refs: <full-git-sha>   # optional: lets coverage flag per-contract baselines that loosen the default
       yq-version: "4.45.1"
-      mode: report
+      mode: enforce
 ```
 
 Omit `contract-id` and the matrix when the descriptor registers exactly one

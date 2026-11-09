@@ -24,11 +24,11 @@ it used.
 Which one to use:
 
 - **Version tag**: the default. One readable string to change when you upgrade,
-  and nothing changes under you between upgrades. Use it once a check is
-  enforced.
+  and nothing changes under you between upgrades. Use it for enforced checks,
+  which is the recommended mode.
 - **`stable`**: no upgrades to make. Your check can start reporting new findings
-  after a promotion without a change in your repository, so it suits report mode
-  better than an enforced gate.
+  after a promotion without a change in your repository, which in enforce mode means
+  a pull request can start failing, so prefer a version tag.
 - **`latest`**: for trying a release before it reaches `stable`. Not for gates.
 - **Full commit SHA**: when you need the strongest guarantee, for example a
   repository that requires SHA pins for every action. Add the release as a comment
@@ -38,7 +38,7 @@ Dependabot (`package-ecosystem: github-actions`) and Renovate can open upgrade
 pull requests for version tags and for SHA pins that carry a version comment.
 
 A change to the pinned ref changes what the check protects, so keep the workflow
-file code-owned (see the [onboarding checklist](onboarding/README.md#checklist),
+file code-owned (see the [onboarding checklist](onboarding/README.md#provider-checklist),
 step 7).
 
 ## Cutting a release
