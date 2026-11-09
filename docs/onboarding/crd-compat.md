@@ -31,13 +31,21 @@ jobs:
       mode: report
 ```
 
+Set `baseline-refs` to the SHA chosen in
+[Choosing a baseline](README.md#choosing-a-baseline): the commit the RHOAI 3.6
+release was based on, or the SHA that `main` resolves to today when there is none.
+Note where it came from in a comment next to the input.
+
 Start in `report` mode, review findings, then move to `enforce` once the
 provider and consumers agree on the policy.
 
 ## Run locally
 
 ```bash
-baseline_sha=$(git rev-parse refs/remotes/origin/main)
+# Preferred: the commit the RHOAI 3.6 release was based on
+baseline_sha=$(git rev-parse '<3.6-release-tag>^{commit}')
+# Fallback when there is no 3.6 release commit: the SHA main resolves to today
+# baseline_sha=$(git rev-parse refs/remotes/<trusted-remote>/main)
 python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/contract-tests/cli.py crd-check \
   --repo . \
   --crd-glob 'config/crd/**/*.yaml' \

@@ -76,6 +76,10 @@ Rules that apply either way:
 - Next to the setting, record the SHA's source (the tag or branch name, or
   "`main` on <date>") in a comment so a reviewer can verify it.
 
+The same guidance is in `$ACT/docs/onboarding/README.md` (Choosing a baseline) and
+`$ACT/docs/onboarding/consumer-compat.md` (Choosing the provider reference); keep
+them consistent.
+
 ## Procedure
 
 ### 1. Identify the provider boundary

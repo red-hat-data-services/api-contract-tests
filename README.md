@@ -46,6 +46,12 @@ Every check pins `oasdiff` and `yq` in the provider descriptor and resolves
 each baseline to a full Git SHA. Mutable refs such as `main`, `HEAD`, tags,
 and branches are rejected.
 
+The baseline decides what the check protects, so choose it deliberately: the
+commit the RHOAI 3.6 release was based on, or the SHA that `main` resolves to
+today when there is none. See
+[Choosing a baseline](docs/onboarding/README.md#choosing-a-baseline) for why it
+matters and how to find the commit.
+
 Before relying on the check, confirm every OpenAPI document in the repository
 is registered (or excluded with a reason):
 

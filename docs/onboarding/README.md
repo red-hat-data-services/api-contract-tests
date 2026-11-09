@@ -48,7 +48,8 @@ repository supplies the runner, schemas, and reusable workflows.
    [OpenAPI guide](openapi-compat.md#2-write-a-contractset-descriptor). One
    descriptor can hold several contracts.
 
-4. **Run the checks locally** with the pinned tools:
+4. **Run the checks locally** with the pinned tools and the baseline you chose in
+   [Choosing a baseline](#choosing-a-baseline):
    [OpenAPI](openapi-compat.md#4-run-it-locally) and, if you ship CRDs,
    [CRD](crd-compat.md#run-locally).
 
@@ -65,7 +66,8 @@ repository supplies the runner, schemas, and reusable workflows.
    it. Never by deleting the check.
 
 6. **Add the workflow** in report mode, pinned to a release of this
-   repository, for example `@v0.1.0`. See [Adding CI](openapi-compat.md#5-add-ci)
+   repository, for example `@v0.1.0`, with `baseline-refs` set to the baseline SHA
+   you chose. See [Adding CI](openapi-compat.md#5-add-ci)
    and [releases and pinning](../releasing.md) for the choices (version tag,
    `stable`, `latest` or a full commit SHA).
 
@@ -84,7 +86,8 @@ repository supplies the runner, schemas, and reusable workflows.
 
 1. **Identify the provider contract.** Record the provider repository, contract
    ID, declared artifact path, owner, support level, and an immutable full-SHA
-   baseline. If the provider has not registered a contract, start with the
+   baseline, chosen as in [Choosing a baseline](#choosing-a-baseline) but for the
+   provider repository. If the provider has not registered a contract, start with the
    [provider checklist](#provider-checklist) instead.
 
 2. **Inventory the consumer's reliance.** Use code and tests to list the
@@ -103,7 +106,7 @@ repository supplies the runner, schemas, and reusable workflows.
 
 5. **Run against a pinned provider.** Record the provider SHA, test command, tool
    versions, and result. Run against provider `main` as a separate drift signal;
-   do not record `main` as the baseline.
+   do not record the name `main` as the baseline.
 
 6. **Add report-mode CI.** Run the consumer tests on consumer changes and
    provider syncs. Pin any reusable workflow to a release tag or full SHA, never
@@ -115,15 +118,46 @@ repository supplies the runner, schemas, and reusable workflows.
 
 ## Choosing a baseline
 
-The baseline is a full Git SHA of your own repository, and it defines what counts
-as released: whatever exists there must stay compatible; whatever does not exist
-there yet is new and may still change. Which commit to use (the last EA release or
-the last minor release) is a per-repository decision that the working group has
-not standardized. Whatever you choose:
+The baseline is the most important value in the configuration. It is a full Git
+SHA of your own repository, and it defines what counts as released: whatever
+exists there must stay compatible; whatever does not exist there yet is new and
+may still change.
 
-- there should be no breaking API change within one major version, so moving
-  the baseline forward is an exception that someone other than the author must
-  approve;
+**Why the choice matters.**
+
+- A baseline that is too new (for example a commit after a breaking change)
+  silently accepts breaks to APIs that already shipped: the check passes and
+  consumers break later.
+- A baseline that is too old, or from another release line, makes every
+  intentional change since then look like a break. The check fails on every pull
+  request and teams stop trusting it.
+- The baseline is a promise. Moving it forward is an exception that someone other
+  than the author must approve, so a wrong choice is expensive to undo.
+
+**Which commit to use.** Pick the first that applies:
+
+1. The commit the RHOAI 3.6 release was based on: the commit of the 3.6 GA release
+   tag, or the head of the 3.6 release branch, on the trusted remote. Names vary
+   by repository (`odh-v3.6.0`, `odh-3.6.0`, `v3.6.0`, `release/odh-3.6.0`,
+   `rhoai-3.6`); `git tag --list '*3.6*'` and `git branch -r --list '*3.6*'` find
+   them. Prefer the GA tag over EA and RC tags, and resolve it to a full SHA with
+   `git rev-parse '<tag>^{commit}'`.
+2. Otherwise, the SHA that `main` (the default branch) resolves to today:
+   `git rev-parse refs/remotes/<trusted-remote>/main`. Everything on `main` is then
+   treated as released and protected from now on, earlier releases are not
+   compared, and anything already broken on `main` is accepted.
+
+This is the recommended default, not a rule: a repository that must protect a
+different supported release can use it, and should record the reason. Whichever you
+choose:
+
+- record the SHA's source (the tag or branch name, or "`main` on <date>") in a
+  comment next to the setting, so a reviewer can verify it;
+- use the same SHA everywhere the repository default is set: the workflow's
+  `baseline-refs`, `--baseline-ref` in local runs, and `spec.baseline.refs` if the
+  descriptor carries one;
+- there should be no breaking API change within one major version, which is why
+  moving the baseline forward needs someone other than the author to approve it;
 - pass several baselines when more than one supported release must stay
   compatible; each contract is compared only against the baselines that contain it;
 - never use a branch name, tag, or `HEAD`; the runner rejects them.
@@ -175,10 +209,12 @@ repository, not something this repository does for you.
 Two assistant skills encode these paths:
 
 - `.claude/skills/onboard-api-contracts/SKILL.md` covers the provider path. It
-  runs `discover`, drafts the descriptor, asks the scoping and baseline
+  runs `discover`, drafts the descriptor, explains why the baseline SHA matters and
+  proposes one (the 3.6 release base, or the current `main` SHA), asks the scoping
   questions, runs the checks and `coverage`, and prepares the workflow.
 - `.claude/skills/onboard-consumer-contracts/SKILL.md` covers the consumer path.
-  It inventories reliance from code and tests, drafts the profile, verifies the
-  consumer tests, and prepares report-mode CI.
+  It inventories reliance from code and tests, proposes the provider baseline the
+  same way, drafts the profile, verifies the consumer tests, and prepares
+  report-mode CI.
 
 Both skills stop before pushing or opening a pull request unless you ask.

@@ -75,6 +75,9 @@ Rules that apply either way:
 - Next to the setting, record the SHA's source (the tag or branch name, or
   "`main` on <date>") in a comment so a reviewer can verify it.
 
+The same guidance is in `$ACT/docs/onboarding/README.md` (Choosing a baseline); keep
+the two consistent.
+
 ## Procedure
 
 ### 1. Inventory
