@@ -46,6 +46,12 @@ Every check pins `oasdiff` and `yq` in the provider descriptor and resolves
 each baseline to a full Git SHA. Mutable refs such as `main`, `HEAD`, tags,
 and branches are rejected.
 
+The baseline decides what the check protects, so choose it deliberately: the
+commit the RHOAI 3.6 release was based on, or the SHA that `main` resolves to
+today when there is none. See
+[Choosing a baseline](docs/onboarding/README.md#choosing-a-baseline) for why it
+matters and how to find the commit.
+
 Before relying on the check, confirm every OpenAPI document in the repository
 is registered (or excluded with a reason):
 
@@ -77,10 +83,12 @@ For the consumer side, start with the
 ```text
 .
 ├── cmd/contract-tests/       # Local runner
+├── cmd/release-baseline/     # Finds the commit an RHOAI release was based on (baseline SHA)
 ├── modules/openapi-compat/   # OpenAPI compatibility engine
 ├── modules/crd-compat/       # Static CRD compatibility engine
 ├── modules/coverage/         # Coverage check and repository discovery
 ├── schemas/                  # ContractSet descriptor schema
+├── data/release-baselines/   # Generated release baselines, per release
 ├── .claude/skills/           # Assistant skills for provider and consumer onboarding
 ├── docs/
 │   ├── architecture.md       # Ownership and enforcement model
@@ -100,7 +108,7 @@ For the consumer side, start with the
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
-OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests cmd/action-pins/tests cmd/workflow-steps/tests -v
+OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests cmd/action-pins/tests cmd/workflow-steps/tests cmd/release-baseline/tests -v
 ```
 
 CI also lints the workflows with [actionlint](https://github.com/rhysd/actionlint)
@@ -117,7 +125,7 @@ The runner and modules are type-checked with mypy (settings in `mypy.ini`). Each
 module directory has its own `checker.py`, so check one file at a time:
 
 ```bash
-for file in cmd/contract-tests/cli.py modules/*/*.py; do python3 -m mypy "$file"; done
+for file in cmd/contract-tests/cli.py cmd/release-baseline/release_baseline.py modules/*/*.py; do python3 -m mypy "$file"; done
 ```
 
 The provider workflows keep their logic in `cmd/workflow-steps/steps.py`

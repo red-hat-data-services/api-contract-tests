@@ -1,0 +1,691 @@
+{
+  "generated": "2026-11-09T21:41:30Z",
+  "method": "baseline = merge base of the downstream release branch and the upstream default branch",
+  "release": "3.6",
+  "repos": {
+    "opendatahub-io/MLServer": {
+      "baseline_sha": "5c2fb795663bea30cd6b2890d6c621dbac28b2dd",
+      "default_branch": "master",
+      "downstream_repo": "red-hat-data-services/MLServer",
+      "relation": "diverged",
+      "release_only_commits": 309,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "8dc4eb3e8e7d401fafc12b11a07530c7273477ac",
+      "repo_only_commits": 56
+    },
+    "opendatahub-io/NeMo-Guardrails": {
+      "baseline_sha": "0ab8b3195fd8eed1d875a17f86adc6b696110795",
+      "default_branch": "develop",
+      "downstream_repo": "red-hat-data-services/NeMo-Guardrails",
+      "relation": "ahead",
+      "release_only_commits": 232,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "bc0f5d7ec55f47e3bb0085d4efdce3d2dd6f64bd",
+      "repo_only_commits": 0
+    },
+    "opendatahub-io/ai-gateway-controller": {
+      "baseline_sha": "4fde3ae0af2d21debb8bfc18b3948149ed705e57",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/ai-gateway-controller",
+      "relation": "diverged",
+      "release_only_commits": 200,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "2cf43638f9ffac51bb39dda9f9ce5f7c7f4d4085",
+      "repo_only_commits": 1
+    },
+    "opendatahub-io/ai-gateway-operator": {
+      "baseline_sha": "0e56970e8d41c4867e25e2830203e58b4135c50e",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/ai-gateway-operator",
+      "relation": "diverged",
+      "release_only_commits": 239,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "06a2489db7e7b4c51fbd5457f55452d3dc4060ff",
+      "repo_only_commits": 1
+    },
+    "opendatahub-io/ai-gateway-payload-processing": {
+      "baseline_sha": "793f37e623647229011758b331798a3e79f1e2f9",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/ai-gateway-payload-processing",
+      "relation": "diverged",
+      "release_only_commits": 270,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "3c0ce48044e8df90789a193f2182e2e921d2e6db",
+      "repo_only_commits": 1
+    },
+    "opendatahub-io/argo-workflows": {
+      "baseline_sha": "db0a5a16a53bee157c5d0805fea0d13491088518",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/argo-workflows",
+      "relation": "diverged",
+      "release_only_commits": 155,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "a2b8c6644f873fbe03a81cd433640da49f40b0a2",
+      "repo_only_commits": 3
+    },
+    "opendatahub-io/batch-gateway": {
+      "baseline_sha": "d7b768818ea3f8eaead7a13e8378e8c8200254a8",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/batch-gateway",
+      "relation": "diverged",
+      "release_only_commits": 199,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "e3c6d1fe710c75d7593e4abfdd71a10405d06435",
+      "repo_only_commits": 17
+    },
+    "opendatahub-io/data-connect-hub": {
+      "baseline_sha": "cb73c26fa3884cd5772cb38c5cc9db578b0cd2c3",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/data-connect-hub",
+      "relation": "diverged",
+      "release_only_commits": 253,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "d8debbf7314401c78e22f9775e955a4ba08e1f44",
+      "repo_only_commits": 35
+    },
+    "opendatahub-io/data-science-pipelines": {
+      "baseline_sha": "8450509980ec619600a3764e11cc2a708b1cce46",
+      "default_branch": "master",
+      "downstream_repo": "red-hat-data-services/data-science-pipelines",
+      "relation": "diverged",
+      "release_only_commits": 706,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "41361bc047509e3e9a2937f43c62dd683438531e",
+      "repo_only_commits": 13
+    },
+    "opendatahub-io/data-science-pipelines-operator": {
+      "baseline_sha": "1d5636ddbc8d70646aa8f59c3fd7adb75c7a9831",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/data-science-pipelines-operator",
+      "relation": "diverged",
+      "release_only_commits": 579,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "eb633abb433480293d2c296a50628c631f424e5e",
+      "repo_only_commits": 29
+    },
+    "opendatahub-io/distributed-workloads": {
+      "baseline_sha": "2da362e5c9c21e5eda537d482f4c831b89f41437",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/distributed-workloads",
+      "relation": "diverged",
+      "release_only_commits": 889,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "ed078ddeeb2c66e10974b7a11fd6ba2bafbd63fb",
+      "repo_only_commits": 9
+    },
+    "opendatahub-io/eval-hub": {
+      "baseline_sha": "e150d67db9ffdf507511f2b8286eae75e11174c5",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/eval-hub",
+      "relation": "diverged",
+      "release_only_commits": 381,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "27caab0d5c70102de52597e449bcdc73379c5e25",
+      "repo_only_commits": 33
+    },
+    "opendatahub-io/eval-hub-contrib": {
+      "baseline_sha": "1bbbc5848a04b3bc65cb4daf554facd0ca40b336",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/eval-hub-contrib",
+      "relation": "diverged",
+      "release_only_commits": 119,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "726553a0300e93cd293e507626bb906a512239b7",
+      "repo_only_commits": 11
+    },
+    "opendatahub-io/feast": {
+      "baseline_sha": "2dfb9e6d1a37719fd11028d916094050f1cdd552",
+      "default_branch": "master",
+      "downstream_repo": "red-hat-data-services/feast",
+      "relation": "diverged",
+      "release_only_commits": 519,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "6cbbb7bde63ceb7e308bf3e673f98a207593cdd5",
+      "repo_only_commits": 571
+    },
+    "opendatahub-io/feast-module-operator": {
+      "baseline_sha": "785d2a41af8f3c7d514c0bb0ebe89861b7c13c05",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/feast-module-operator",
+      "relation": "diverged",
+      "release_only_commits": 177,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "510ef1feab7cdbe148a68abaa7192134359f77f4",
+      "repo_only_commits": 13
+    },
+    "opendatahub-io/fms-guardrails-orchestrator": {
+      "baseline_sha": "41eac533558d9494a082e6347e0d18959ca5d74c",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/fms-guardrails-orchestrator",
+      "relation": "diverged",
+      "release_only_commits": 165,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "5fbfaf312f00102d50c7064940084cf0eeecc439",
+      "repo_only_commits": 10
+    },
+    "opendatahub-io/guardrails-detectors": {
+      "baseline_sha": "cd0787ab9f21f37144494a3d6899c616bc4fd430",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/guardrails-detectors",
+      "relation": "diverged",
+      "release_only_commits": 133,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "4aa709a469a1f5b05527a87b6b569263158c473c",
+      "repo_only_commits": 22
+    },
+    "opendatahub-io/guardrails-regex-detector": {
+      "baseline_sha": "9d37ea23953aca05271dd70a6914fe926349a0cc",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/guardrails-regex-detector",
+      "relation": "diverged",
+      "release_only_commits": 2,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "5c6116749e66a3496f7a5ac7427219f294df7ec3",
+      "repo_only_commits": 1
+    },
+    "opendatahub-io/kserve": {
+      "baseline_sha": "f860cfb4a996e22e9afbe477981fde08f5af97bc",
+      "default_branch": "master",
+      "downstream_repo": "red-hat-data-services/kserve",
+      "relation": "diverged",
+      "release_only_commits": 496,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "94c363cbb0045b6df2e27b215e614533a215e832",
+      "repo_only_commits": 4
+    },
+    "opendatahub-io/kube-auth-proxy": {
+      "baseline_sha": "099df59d2dd5177578bda97ea640d2b6a7782bd0",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/kube-auth-proxy",
+      "relation": "diverged",
+      "release_only_commits": 222,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "d07626d4082fb9bb05ee105477b33f823c25c30f",
+      "repo_only_commits": 1
+    },
+    "opendatahub-io/kube-rbac-proxy": {
+      "baseline_sha": "8fe9016316d294aa3f4ff56d60b33c72cd9c4871",
+      "default_branch": "master",
+      "downstream_repo": "red-hat-data-services/kube-rbac-proxy",
+      "relation": "ahead",
+      "release_only_commits": 168,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "4e7b1f8ce13a3927309c0b430924e77f548ae070",
+      "repo_only_commits": 0
+    },
+    "opendatahub-io/kubeflow": {
+      "baseline_sha": "9ae2b2af88080c54381fe22652403fc61291e134",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/kubeflow",
+      "relation": "diverged",
+      "release_only_commits": 874,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "16266e7063d84584693c056e71fa754b3e88db52",
+      "repo_only_commits": 10
+    },
+    "opendatahub-io/kuberay": {
+      "baseline_sha": "71a89cfae60be11ce90dfc641a84f7dd23e16e62",
+      "default_branch": "dev",
+      "downstream_repo": "red-hat-data-services/kuberay",
+      "relation": "diverged",
+      "release_only_commits": 305,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "bf1dd2509f8bd7ee83bc7712a9b147a548263ff3",
+      "repo_only_commits": 2
+    },
+    "opendatahub-io/llama-stack-provider-trustyai-garak": {
+      "baseline_sha": "bd285bf5cf0b4296a8883ce0721d466aadeee196",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/llama-stack-provider-trustyai-garak",
+      "relation": "ahead",
+      "release_only_commits": 183,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "d3fc4f721cf1c769c68895f32df3c6b1ec0bdc78",
+      "repo_only_commits": 0
+    },
+    "opendatahub-io/llm-d-async": {
+      "baseline_sha": "96ec8b67eb9acb7e369d85c599b0cb7fef360a6d",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/llm-d-async",
+      "relation": "diverged",
+      "release_only_commits": 149,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "86db0b0244a9ecc8afa07df1bc30070c2b61e57d",
+      "repo_only_commits": 7
+    },
+    "opendatahub-io/llm-d-batch-gateway-operator": {
+      "baseline_sha": "93f1c2c021a7ebae6f44c9e1dd05d7c9a34a46e8",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/llm-d-batch-gateway-operator",
+      "relation": "ahead",
+      "release_only_commits": 169,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "cd28f7db59ebbb8b19766d463390fb99b8fd9585",
+      "repo_only_commits": 0
+    },
+    "opendatahub-io/llm-d-kv-cache": {
+      "baseline_sha": "f4cd204a8603b5fefbff769e49d95ac71e2d6291",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/llm-d-kv-cache",
+      "relation": "ahead",
+      "release_only_commits": 106,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "b71be515baf6f74373b7d5a4bd4b047bd106d7b8",
+      "repo_only_commits": 0
+    },
+    "opendatahub-io/llm-d-router": {
+      "baseline_sha": "669474c4b8151dbc6eb1d95ee05eda48d584e501",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/llm-d-router",
+      "relation": "ahead",
+      "release_only_commits": 184,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "7bb4dd3e7b6dfbdb7c54f6c28aa17546b0fd6c1a",
+      "repo_only_commits": 0
+    },
+    "opendatahub-io/lm-evaluation-harness": {
+      "baseline_sha": "0845b588303f1f59af98dd1c5bdbd78a9e75a1e2",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/lm-evaluation-harness",
+      "relation": "diverged",
+      "release_only_commits": 468,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "8f502fdb4c373a26ae6fef934517efab659e9052",
+      "repo_only_commits": 599
+    },
+    "opendatahub-io/mcp-lifecycle-module-operator": {
+      "baseline_sha": "ad7ec544d9e45620c32615bd6af34269ecd0b23b",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/mcp-lifecycle-module-operator",
+      "relation": "diverged",
+      "release_only_commits": 170,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "c7db8c48337741d51adbc2f875ba98e1a20af551",
+      "repo_only_commits": 16
+    },
+    "opendatahub-io/mcp-lifecycle-operator": {
+      "baseline_sha": "54191cfbfd1277457d6a85aadafa5d4e8b362b13",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/mcp-lifecycle-operator",
+      "relation": "diverged",
+      "release_only_commits": 176,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "27bab1f8dee2ec9ebe409a36e37a09db494bf8b0",
+      "repo_only_commits": 38
+    },
+    "opendatahub-io/ml-metadata": {
+      "baseline_sha": "eb040755426afeb3d3a3f4cc427fd059d79631aa",
+      "default_branch": "master",
+      "downstream_repo": "red-hat-data-services/ml-metadata",
+      "relation": "ahead",
+      "release_only_commits": 364,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "de0060d4d8cb47d77c8c1833325f50d30fc6b009",
+      "repo_only_commits": 0
+    },
+    "opendatahub-io/mlflow": {
+      "baseline_sha": "8025a9359662ac92db173d5d944f085a61f90fd3",
+      "default_branch": "master",
+      "downstream_repo": "red-hat-data-services/mlflow",
+      "relation": "diverged",
+      "release_only_commits": 157,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "09bb13b8c1b269b283f4afa04aee6b5c28663bc6",
+      "repo_only_commits": 3
+    },
+    "opendatahub-io/mlflow-operator": {
+      "baseline_sha": "8cce38d303a578fb17e0a00ca82c227a06eb74f5",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/mlflow-operator",
+      "relation": "diverged",
+      "release_only_commits": 315,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "e628ac4f13f1ac92b4c88782924536f09c8ed8ed",
+      "repo_only_commits": 1
+    },
+    "opendatahub-io/model-metadata-collection": {
+      "baseline_sha": "13eade2f2529b073e9a95e33147809ab58d7fc35",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/model-metadata-collection",
+      "relation": "diverged",
+      "release_only_commits": 212,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "826028787536f9b460ccd6572de9e3de8154117f",
+      "repo_only_commits": 5
+    },
+    "opendatahub-io/model-registry": {
+      "baseline_sha": "8912d5886ed1a38cd7039848d235b4d8fb953641",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/model-registry",
+      "relation": "diverged",
+      "release_only_commits": 817,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "d42d2cddbc6678b355260a3c1ffe5030b5713b4e",
+      "repo_only_commits": 21
+    },
+    "opendatahub-io/model-registry-operator": {
+      "baseline_sha": "ce0e41a415d4895b1b70bbdfcff2ee5344784650",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/model-registry-operator",
+      "relation": "diverged",
+      "release_only_commits": 582,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "e7d41c899449b136183ec81bdd4af81f7bc07a35",
+      "repo_only_commits": 12
+    },
+    "opendatahub-io/models-as-a-service": {
+      "baseline_sha": "2b8a663c76825306f3c12445ce5a21eebea3b001",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/models-as-a-service",
+      "relation": "diverged",
+      "release_only_commits": 598,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "6a1e62904af971073503eb442d3d15e1efa9308e",
+      "repo_only_commits": 6
+    },
+    "opendatahub-io/notebooks": {
+      "baseline_sha": "21bf6eafe4d28bd8b1c51eae446f43802cdf3289",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/notebooks",
+      "relation": "diverged",
+      "release_only_commits": 1425,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "8f85508a5e276be1c66582f79ff5d36b9b25c1a7",
+      "repo_only_commits": 75
+    },
+    "opendatahub-io/odh-cli": {
+      "baseline_sha": "205256b2a1985d40aca3bd020440ba17873db10b",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/odh-cli",
+      "relation": "ahead",
+      "release_only_commits": 310,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "f6c217b10879609c004e6a4ab650073b6092a8e5",
+      "repo_only_commits": 0
+    },
+    "opendatahub-io/odh-dashboard": {
+      "baseline_sha": "7ded3cd6c3103e754112573b3bae5339e40e2c6d",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/odh-dashboard",
+      "relation": "diverged",
+      "release_only_commits": 1837,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "55b96e2d8b71c014eb209b23e0e972ffaef1eefa",
+      "repo_only_commits": 87
+    },
+    "opendatahub-io/odh-gitops": {
+      "baseline_sha": "f909585080dd984edc11e674aaa76b79bd1aeebd",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/odh-gitops",
+      "relation": "diverged",
+      "release_only_commits": 148,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "c5eae59ede7bceaccc483617804a36d3f096f274",
+      "repo_only_commits": 18
+    },
+    "opendatahub-io/odh-model-controller": {
+      "baseline_sha": "1053962734c004812d0e523e767c1a901fb947fe",
+      "default_branch": "incubating",
+      "downstream_repo": "red-hat-data-services/odh-model-controller",
+      "relation": "diverged",
+      "release_only_commits": 933,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "1c02868e55848d0c62323b462bcc57959504e387",
+      "repo_only_commits": 3
+    },
+    "opendatahub-io/odh-observability": {
+      "baseline_sha": "ff3515361da72b0de85a78299c67a611a01cadbd",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/odh-observability",
+      "relation": "diverged",
+      "release_only_commits": 194,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "634a86d93fddbac9cba813d7ef4cd96e8fd3f781",
+      "repo_only_commits": 10
+    },
+    "opendatahub-io/ogx-distribution": {
+      "baseline_sha": "687b0fa092e44fabe53e62e0d55ca6b955225fd1",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/ogx-distribution",
+      "relation": "diverged",
+      "release_only_commits": 350,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "5472be76e3a1f0774dd99dc8c8c65c227c563cf4",
+      "repo_only_commits": 36
+    },
+    "opendatahub-io/ogx-k8s-operator": {
+      "baseline_sha": "8b64e25c315e9bfe9301e087ec22c84890527dcb",
+      "default_branch": "odh",
+      "downstream_repo": "red-hat-data-services/ogx-k8s-operator",
+      "relation": "diverged",
+      "release_only_commits": 277,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "a78a844dfa25e61f76b1a30bad6d039d6f6a5eb6",
+      "repo_only_commits": 5
+    },
+    "opendatahub-io/opendatahub-db-operator": {
+      "baseline_sha": "4c799d275bf186db83a69c57fa925d94d382bd96",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/rhai-db-operator",
+      "relation": "diverged",
+      "release_only_commits": 79,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "c4a888b576b33d7ca9b2da5e95b6109ca25bea60",
+      "repo_only_commits": 10
+    },
+    "opendatahub-io/opendatahub-operator": {
+      "baseline_sha": "c5045b050e345713cf3646f3bd5d80a753fd5952",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/rhods-operator",
+      "relation": "diverged",
+      "release_only_commits": 12604,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "dee6a2cb6dfc7a7179ed93a2ef9f42b4b5efbf76",
+      "repo_only_commits": 20
+    },
+    "opendatahub-io/openshell": {
+      "baseline_sha": "469e16d406a556ae115043b62ebceeb72dd29346",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/OpenShell",
+      "relation": "diverged",
+      "release_only_commits": 268,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "6e0c94e3634a0cbbb70719916610be12152636df",
+      "repo_only_commits": 330
+    },
+    "opendatahub-io/openshell-dashboard": {
+      "baseline_sha": "bdcc98074c66fef6a8d816a0622bb08b23cff02d",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/openshell-dashboard",
+      "relation": "diverged",
+      "release_only_commits": 73,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "7fe07b4118b2648aafc803645fab9219cb398532",
+      "repo_only_commits": 4
+    },
+    "opendatahub-io/openvino_model_server": {
+      "baseline_sha": "ca30357bf991b45763c73c5af3af496ab9e54a81",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/openvino_model_server",
+      "relation": "diverged",
+      "release_only_commits": 101,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "21f0f076159ec7e0d09592388837e9d5dea25f99",
+      "repo_only_commits": 297
+    },
+    "opendatahub-io/pipelines-components": {
+      "baseline_sha": "2caf7c4fcc4db227bf0e7530a0cd79593b29a30b",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/pipelines-components",
+      "relation": "diverged",
+      "release_only_commits": 416,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "dd698efd248a08ac7445fb55dbf817c7be46a082",
+      "repo_only_commits": 5
+    },
+    "opendatahub-io/praxis-ai-grid-operator": {
+      "baseline_sha": "db11454660b7be62bccffe4888560c1636d39305",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/praxis-ai-grid-operator",
+      "relation": "ahead",
+      "release_only_commits": 153,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "c7a887f5a4a89cdc1c44cf45357d5e9abfa77d97",
+      "repo_only_commits": 0
+    },
+    "opendatahub-io/praxis-extproc": {
+      "baseline_sha": "1632a345668940cb1cf415f8a1982c9723e02d9e",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/praxis-extproc",
+      "relation": "ahead",
+      "release_only_commits": 202,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "e5a4426a6bc39132c72ab3051fe433a6b6c24158",
+      "repo_only_commits": 0
+    },
+    "opendatahub-io/ray-module-operator": {
+      "baseline_sha": "2dee62aa88e752d61039ddc459400386dad7b8ba",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/ray-module-operator",
+      "relation": "diverged",
+      "release_only_commits": 83,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "9860be0a481a339bcf211c08d278b7d6d8830a52",
+      "repo_only_commits": 2
+    },
+    "opendatahub-io/rhaii-cluster-validation": {
+      "baseline_sha": "fe38c38d8e34ba31b88c7899104c3a5c80362619",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/rhaii-cluster-validation",
+      "relation": "diverged",
+      "release_only_commits": 171,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "b5c6d23c203ceccfb74629d252b381b798dd4523",
+      "repo_only_commits": 2
+    },
+    "opendatahub-io/rhoai-mcp": {
+      "baseline_sha": "260a80b60cd3ee4441dce5d8022289644a9b7f02",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/rhoai-mcp",
+      "relation": "diverged",
+      "release_only_commits": 120,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "2bf30c98710d0e8edc85d140ef4651e29cfd1b8d",
+      "repo_only_commits": 19
+    },
+    "opendatahub-io/spark-operator": {
+      "baseline_sha": "bf909c6e354deff65a4742ad7c874f0af9cd9137",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/spark-operator",
+      "relation": "diverged",
+      "release_only_commits": 227,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "3e27bc219bf757dc39a6e90e9be9da912e1b23b6",
+      "repo_only_commits": 2
+    },
+    "opendatahub-io/trainer": {
+      "baseline_sha": "aa9769ac66d5928205bc60ff3f670908bebc0a8c",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/trainer",
+      "relation": "diverged",
+      "release_only_commits": 257,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "047794d7f6dcf994ac5b7cc60d1feae8483a1db2",
+      "repo_only_commits": 149
+    },
+    "opendatahub-io/trainer-operator": {
+      "baseline_sha": "77cc419c9045395ef7c14c5efe149534215199e0",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/trainer-operator",
+      "relation": "ahead",
+      "release_only_commits": 191,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "e695af8508751a9a996a0458aca2ade7c8d24580",
+      "repo_only_commits": 0
+    },
+    "opendatahub-io/training-operator": {
+      "baseline_sha": "28a60bd79b9dbbb39cd674d3660fa27ab1b42bdb",
+      "default_branch": "dev",
+      "downstream_repo": "red-hat-data-services/training-operator",
+      "relation": "diverged",
+      "release_only_commits": 439,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "a7b77b908d7371f3a826edd24f9a165544178552",
+      "repo_only_commits": 14
+    },
+    "opendatahub-io/trustyai-explainability": {
+      "baseline_sha": "59cb99d0a02958933a728093b7690ace0657f00b",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/trustyai-explainability",
+      "relation": "diverged",
+      "release_only_commits": 122,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "6e780cdc9c06463f1c2a4848842676220fe0a905",
+      "repo_only_commits": 30
+    },
+    "opendatahub-io/trustyai-service": {
+      "baseline_sha": "fcef8ad5cc5a6163d9b75ccb85665404ed4dc8f7",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/trustyai-service",
+      "relation": "diverged",
+      "release_only_commits": 82,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "96690d4cd9522be4c1a7ac649b3ce2a791642533",
+      "repo_only_commits": 3
+    },
+    "opendatahub-io/trustyai-service-operator": {
+      "baseline_sha": "3ecd158c38e7c3bcb844ee87a100427a96a9c88b",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/trustyai-service-operator",
+      "relation": "diverged",
+      "release_only_commits": 373,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "015326efbb6b755b7ca1847e992f34f3d01c302d",
+      "repo_only_commits": 140
+    },
+    "opendatahub-io/vllm-gaudi": {
+      "baseline_sha": "6822bb3a7f563bec7abbe7048abb0eface111e47",
+      "default_branch": "v1.19.0",
+      "downstream_repo": "red-hat-data-services/vllm-gaudi",
+      "relation": "ahead",
+      "release_only_commits": 5072,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "6c66cbc77235a1fb60f00f6b37fc652cd6f615c5",
+      "repo_only_commits": 0
+    },
+    "opendatahub-io/vllm-orchestrator-gateway": {
+      "baseline_sha": "6d43cddb195abdd568678625f9e1455bdad57f6f",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/vllm-orchestrator-gateway",
+      "relation": "diverged",
+      "release_only_commits": 53,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "380be248b7d18a2585bf885e948823aec47c5d9e",
+      "repo_only_commits": 13
+    },
+    "opendatahub-io/workbenches": {
+      "baseline_sha": "2f93ce390c11ca44081498e4c2539a4817733491",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/workbenches",
+      "relation": "diverged",
+      "release_only_commits": 85,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "003d2f939777190be2126975ae0d6ec28d1c363f",
+      "repo_only_commits": 9
+    },
+    "opendatahub-io/workbenches-operator": {
+      "baseline_sha": "8c7d911ebf996df7788514001ce0bffc49f6a288",
+      "default_branch": "main",
+      "downstream_repo": "red-hat-data-services/workbenches-operator",
+      "relation": "diverged",
+      "release_only_commits": 254,
+      "release_ref": "rhoai-3.6",
+      "release_sha": "c72357102e5da8e14048ea9795e983ca5b439eee",
+      "repo_only_commits": 24
+    }
+  },
+  "unresolved": {
+    "opendatahub-io/kserve-autogluon-server": "opendatahub-io/kserve-autogluon-server and red-hat-data-services/kserve-autogluon-server share no history that GitHub can compare (not found: /repos/opendatahub-io/kserve-autogluon-server/compare/master...e215eb2a06eaabf4a3b1f911769cff3df8a376ba); use the SHA that the default branch resolves to",
+    "opendatahub-io/modelexpress": "opendatahub-io/modelexpress and red-hat-data-services/modelexpress share no history that GitHub can compare (not found: /repos/opendatahub-io/modelexpress/compare/main...2a9b9d009db699fc135c452b197c00caad918426); use the SHA that the default branch resolves to"
+  }
+}

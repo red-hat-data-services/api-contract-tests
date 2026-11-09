@@ -15,8 +15,11 @@ python3 cmd/contract-tests/cli.py check \
 
 `--baseline-ref` is the repository default and is optional when the descriptor
 declares `spec.baseline.refs` or the contract its own `baseline`. An API absent
-at a default baseline is reported as `new`, not a failure; see
-[`docs/onboarding`](../../docs/onboarding/README.md#choosing-a-baseline).
+at a default baseline is reported as `new`, not a failure. Use the commit the RHOAI
+3.6 release was based on, or the SHA that `main` resolves to today when there is
+none; see
+[`docs/onboarding`](../../docs/onboarding/README.md#choosing-a-baseline) for why it
+matters.
 
 The same command runs locally and in CI — there is no separate "CI mode" —
 so a result is always reproducible without a cluster. See

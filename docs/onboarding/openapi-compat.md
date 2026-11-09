@@ -112,7 +112,11 @@ builds that print `main`, it checks the binary's embedded Go module version.
 ## 4. Run it locally
 
 ```bash
-baseline_sha=$(git rev-parse refs/remotes/<trusted-remote>/main)
+# Preferred: the commit the RHOAI 3.6 release was based on
+baseline_sha=$(python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/release-baseline/release_baseline.py \
+  lookup --release 3.6 --repo <org>/<repo> --format sha)
+# Fallback when the tool reports no baseline: the SHA main resolves to today
+# baseline_sha=$(git rev-parse refs/remotes/<trusted-remote>/main)
 python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/contract-tests/cli.py check \
   --repo . \
   --contract-set .rhoai/contracts.yaml \
@@ -129,6 +133,11 @@ Read `report.json.status`, not just the exit code: report-only mode exits
 `0` even when breaking findings are recorded.
 
 ### Baselines
+
+Choose the repository default as described in
+[Choosing a baseline](README.md#choosing-a-baseline): the commit the RHOAI 3.6
+release was based on, or the SHA that `main` resolves to today when there is none.
+The choice decides what the check protects, so read why it matters there first.
 
 `--baseline-ref` (or the workflow's `baseline-refs`) is the repository default.
 A contract can override it with its own `baseline` block (`refs`, a mandatory
@@ -153,7 +162,8 @@ the contract's `baseline`, then `--baseline-ref`, then `spec.baseline.refs`.
 - **Wrong versions still fail.** A baseline that has the file but no paths under
   `matchPath` is an error.
 
-See the [checklist](README.md#choosing-a-baseline) for when to use an override.
+See the [checklist](README.md#choosing-a-baseline) for how to choose the baseline
+and when to use an override.
 
 ### Confirm nothing is left out
 
@@ -229,11 +239,15 @@ jobs:
 Omit `contract-id` and the matrix when the descriptor registers exactly one
 contract. Each contract uploads its own `contract-report-<id>` artifact.
 
+Set `baseline-refs` in both jobs to the SHA chosen in
+[Choosing a baseline](README.md#choosing-a-baseline), and note where it came from
+(the tag or branch name, or "`main` on <date>") in a comment.
+
 The workflows reject a branch or unknown tag as their own reusable-workflow ref, install exact tool
 versions, and reject mutable baseline refs. A change to `baseline-refs`, to the
 pinned workflow ref, or to the descriptor changes what the check protects, so
 require an owner's review for those files (see the
-[checklist](README.md#checklist), step 7).
+[checklist](README.md#provider-checklist), step 7).
 
 ## 6. Register the contract with the working group
 

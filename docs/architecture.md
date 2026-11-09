@@ -20,7 +20,7 @@ provider contracts.
 
 1. Check out the provider pull request.
 2. Generate a fresh candidate contract using a registered adapter and pinned tools.
-3. Require rolling and supported-release baselines as full Git SHAs. A baseline defines what is released: an API that does not exist at the default baseline is new and not compared, while a contract's own baseline is explicit and must contain it.
+3. Require rolling and supported-release baselines as full Git SHAs. A baseline defines what is released: an API that does not exist at the default baseline is new and not compared, while a contract's own baseline is explicit and must contain it. The onboarding checklist recommends the commit the RHOAI 3.6 release was based on as a repository's default baseline, or the SHA that `main` resolves to when there is none (see [Choosing a baseline](onboarding/README.md#choosing-a-baseline)).
 4. Verify baseline artifact digests.
 5. Run the compatibility check and consumer-profile verification.
 6. Confirm the descriptor accounts for every OpenAPI document and CRD in the repository (the coverage check), so a new spec cannot stay outside the gate unnoticed.

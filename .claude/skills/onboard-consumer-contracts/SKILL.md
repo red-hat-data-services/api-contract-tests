@@ -23,11 +23,69 @@ starts in **report** mode, and the consumer check is not a provider merge gate.
   tests into the consumer repository. Reference them by repository, path, and
   ref.
 - Use a full 40-character SHA for the recorded provider baseline. `main` is a
-  drift signal only; never record it as the baseline.
+  drift signal only; never record the name `main` as the baseline. If there is no
+  3.6 release commit to use, record the full SHA that provider `main` resolves to
+  today (see **Provider baseline SHA**).
 - Do not add a cluster requirement or full end-to-end deployment to the consumer
   check. Use the consumer's existing boundary and test harness.
 - Do not push, open a pull request, or comment on one unless the user asks.
   Preparing a branch and a local commit is fine.
+
+## Provider baseline SHA
+
+The provider baseline is the most important value in the reliance profile. Explain
+it to the user in plain words before you ask for it:
+
+- It pins the provider version that the consumer's tests and reliance profile are
+  checked against. A passing run only proves something about that version.
+- If it is not the provider version the consumer actually ships against, the
+  result misleads. A baseline that is **too old** means the consumer is never
+  tested against current provider behavior. A baseline that is **too new** (for
+  example a commit after a breaking change) means it is tested against behavior
+  the shipped provider does not have, or hides a break that already shipped.
+- The baseline is a promise. Moving it later needs review from someone other than
+  the author, so a wrong choice is expensive to undo.
+
+Suggest the baseline in this order, and always let the user confirm it:
+
+1. **The provider commit the RHOAI 3.6 release was based on.** Do not search for
+   tags: the downstream `red-hat-data-services` repositories have no 3.6 tags, only
+   a `rhoai-3.6` branch, and its head is a downstream-only commit that does not
+   exist in the `opendatahub-io` provider repository. The baseline is the newest
+   commit both repositories share (the merge base of `rhoai-3.6` and the provider's
+   default branch). Get it with
+   `python3 $ACT/cmd/release-baseline/release_baseline.py lookup --release 3.6 --repo <org>/<provider-repo>`,
+   which reads `$ACT/data/release-baselines/3.6.json` and needs no network. If the
+   provider is not listed, or the user wants to verify or refresh the value, run
+   `resolve` instead of `lookup` (GitHub API; set `GITHUB_TOKEN` or log in with
+   `gh`). Add `--image <release image>` to take the release commit from the image's
+   source-commit label instead of the branch head. Show the user the baseline SHA,
+   the release commit it was derived from and the data file's `generated` date, and
+   ask them to confirm.
+2. **Otherwise, the current head of the provider's `main`** (its default branch):
+   `git rev-parse refs/remotes/<trusted-remote>/main`. Use this when the provider
+   `lookup` and `resolve` report no baseline (for example a provider with no
+   downstream counterpart or no shared history) or the user cannot confirm one. Tell the user what it
+   means: the provider as it is today is treated as the version the consumer
+   relies on, earlier releases are not covered, and the drift run in step 5 only
+   shows provider changes made after this SHA.
+
+If the provider's `.rhoai/contracts.yaml` already declares a baseline, show it next
+to your suggestion so the user can see whether the two differ.
+
+Rules that apply either way:
+
+- Record a full 40-character SHA resolved from a trusted remote, never from a fork
+  or an unpushed local branch. Never write `main`, a branch, a tag or `HEAD`.
+- Use the same SHA in the reliance profile and in the pinned provider checkout the
+  tests run against (step 5), and wherever the CI workflow pins the provider version.
+- Next to the setting, record the SHA's source (for example "merge base of
+  rhoai-3.6 and main, from release_baseline.py on <date>", or "`main` on <date>")
+  in a comment so a reviewer can verify it.
+
+The same guidance is in `$ACT/docs/onboarding/README.md` (Choosing a baseline) and
+`$ACT/docs/onboarding/consumer-compat.md` (Choosing the provider reference); keep
+them consistent.
 
 ## Procedure
 
@@ -38,7 +96,8 @@ Read the provider's `.rhoai/contracts.yaml` and record:
 - provider repository and owner;
 - contract ID and declared artifact path;
 - API version and support level the consumer claims;
-- full-SHA baseline and artifact digest, if available;
+- full-SHA baseline and artifact digest, if the provider declares them (see
+  **Provider baseline SHA** for what to propose to the user);
 - the consumer entry point that calls the provider (BFF client, SDK, adapter, or
   service client).
 
@@ -59,7 +118,9 @@ Present a table to the user before writing files:
 
 For each row, name the code or test that proves the reliance. List unknowns as
 gaps. Ask the user to confirm the table, the support level, and the provider
-baseline. If the consumer relies on several provider contracts, handle each
+baseline (following **Provider baseline SHA**: explain why it matters, propose the
+3.6 release base or the current provider `main` SHA, and show the SHA with its
+source). If the consumer relies on several provider contracts, handle each
 relationship separately.
 
 ### 3. Draft the reliance profile
@@ -127,7 +188,9 @@ repository already has an artifact convention.
 
 Prepare a summary for the working group:
 
-- provider repository, contract ID, artifact path, and baseline SHA/digest;
+- provider repository, contract ID, artifact path, and baseline SHA/digest, where
+  the baseline came from (the 3.6 release base or current provider `main`), and
+  that the user confirmed it;
 - consumer repository, profile path, test command, and CI workflow;
 - consumer and provider owners;
 - support level and provider releases covered;

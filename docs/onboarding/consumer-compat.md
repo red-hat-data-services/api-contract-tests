@@ -43,10 +43,28 @@ stable contract ID or baseline to refer to.
 
 ### Choosing the provider reference
 
+The recorded provider baseline pins the provider version that the consumer's tests
+and profile are checked against, so a passing run only proves something about that
+version. It must be the version the consumer actually ships against. If it is too
+old, the consumer is never tested against current provider behavior. If it is too
+new (for example a commit after a breaking change), the consumer is tested against
+behavior the shipped provider does not have, or a break that already shipped goes
+unnoticed.
+
+Choose it as the checklist describes in
+[Choosing a baseline](README.md#choosing-a-baseline), applied to the provider
+repository: the provider commit the RHOAI 3.6 release was based on (from
+`release_baseline.py lookup --release 3.6 --repo <org>/<provider-repo>`), or the
+full SHA that the provider's `main` resolves to today when the tool reports no
+baseline. If the provider's descriptor already declares a baseline, compare it with
+your choice.
+
 Use a full SHA for the recorded baseline and for evidence attached to a review.
 Testing against the provider's `main` is useful as a drift signal, but it is not
-a reproducible baseline and must not be recorded as one. When the consumer needs
-to support several provider releases, record each release baseline separately.
+a reproducible baseline and the name `main` must not be recorded as one. When the
+baseline is the current `main` SHA, the drift run only shows provider changes made
+after it. When the consumer needs to support several provider releases, record
+each release baseline separately.
 
 ## 2. Inventory the consumer's reliance
 
@@ -97,7 +115,7 @@ spec:
     contractId: model-catalog-v1
     artifact: api/openapi/catalog-v1.yaml
     baseline:
-      ref: <full-git-sha>
+      ref: <full-git-sha>   # provider commit the 3.6 release was based on, or the current provider main SHA
       digest: <artifact-digest>
   reliance:
     operations:
