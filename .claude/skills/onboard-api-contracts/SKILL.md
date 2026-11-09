@@ -29,6 +29,52 @@ promotion gates. Never describe them as gates.
 - Do not edit generated OpenAPI documents by hand. Regenerate them with the provider's own
   command.
 
+## Baseline SHA
+
+The baseline is the most important value in the configuration. Explain it to the
+user in plain words before you ask for it:
+
+- The baseline commit defines what counts as **released**. Everything that exists
+  there must stay compatible in every later pull request. Anything that does not
+  exist there is reported as `new` and is not compared.
+- A baseline that is **too new** (for example a commit after a breaking change)
+  silently accepts breaks to APIs that already shipped: the check passes and the
+  consumers break later.
+- A baseline that is **too old, or from another release line**, makes every
+  intentional change since then look like a break. The check fails on every pull
+  request and teams stop trusting it.
+- The baseline is a promise. Moving it forward is an exception that someone other
+  than the author must approve, so a wrong choice is expensive to undo.
+
+Suggest the baseline in this order, and always let the user confirm it:
+
+1. **The commit the RHOAI 3.6 release was based on.** Look on the trusted remote
+   for the 3.6 GA release tag or the head of the 3.6 release branch. Names vary
+   (`odh-v3.6.0`, `odh-3.6.0`, `v3.6.0`, `release/odh-3.6.0`, `rhoai-3.6`); use
+   `git tag --list '*3.6*'` and `git branch -r --list '*3.6*'`. Prefer the GA tag
+   over EA and RC tags. Resolve it to a full SHA with
+   `git rev-parse '<tag>^{commit}'` or
+   `git rev-parse refs/remotes/<trusted-remote>/<branch>`, and show the user the
+   SHA, the tag or branch it came from, and the commit subject and date. If there
+   are several candidates, list them and ask; do not pick one silently.
+2. **Otherwise, the current head of `main`** (the repository's default branch):
+   `git rev-parse refs/remotes/<trusted-remote>/main`. Use this when the
+   repository has no 3.6 release commit or the user cannot confirm one. Tell the
+   user what it means: everything on `main` today is treated as released and
+   protected from now on, earlier releases are not compared, and anything already
+   broken on `main` is accepted.
+
+Rules that apply either way:
+
+- Record a full 40-character SHA resolved from a trusted remote, never from a fork
+  or an unpushed local branch. Never write `main`, a branch, a tag or `HEAD`; the
+  runner rejects them.
+- Use the same SHA everywhere the repository default is set: the workflow's
+  `baseline-refs` input, `--baseline-ref` in local runs, and `spec.baseline.refs`
+  if the descriptor carries one.
+- Next to the setting, record the SHA's source (the tag or branch name, or
+  "`main` on <date>") in a comment so a reviewer can verify it.
+
 ## Procedure
 
 ### 1. Inventory
@@ -58,12 +104,12 @@ Present a table: each document, its kind, path count, and your proposed disposit
   several APIs (for example plugin APIs that are out of scope).
 - Which documents are not provider contracts (internal UI APIs, fixtures)? These need a
   `spec.exclusions` entry with a reason.
-- Which baseline? A full SHA of the provider repository. The working group has not
-  standardized EA versus minor release; ask which supported release the contract protects.
-  Resolve it with `git rev-parse refs/remotes/<trusted-remote>/<branch>` and show the SHA
-  and its subject line. An API that does not exist at the baseline is reported as `new`
-  and is not compared, so a baseline that predates a new API is fine; confirm with the
-  user when each API should become protected (when a baseline containing it is adopted).
+- Which baseline? Follow **Baseline SHA** above: explain why it matters, propose the
+  commit the 3.6 release was based on (or the current `main` SHA when there is none),
+  show the full SHA with its source and subject line, and ask the user to confirm.
+  An API that does not exist at the baseline is reported as `new` and is not compared,
+  so a baseline that predates a new API is fine; confirm with the user when each API
+  should become protected (when a baseline containing it is adopted).
 - Does any single API need a different baseline from the rest (for example an agreed
   break)? Then give that contract a `baseline` block with a `reason`; do not move the
   repository default.
@@ -108,6 +154,8 @@ pass that same glob to `coverage --crd-glob`.
 Create `.github/workflows/api-contract.yml` from the example in
 `$ACT/docs/onboarding/openapi-compat.md` (step 5): a compatibility job (a matrix over
 `contract-id` when there are several contracts) and a coverage job, both `mode: report`.
+Set `baseline-refs` to the confirmed baseline SHA, with the source comment described
+in **Baseline SHA**.
 Pin the reusable workflows to the **newest version tag** of `api-contract-tests`
 (`git -C $ACT tag --list 'v*' --sort=-v:refname | head -1`), unless the user asks for
 `stable`, `latest` or a full commit SHA; `$ACT/docs/releasing.md` explains the choices.
@@ -118,7 +166,8 @@ Put a comment in the workflow naming the pinned release and pointing to `docs/re
 
 ### 6. Hand back
 
-Summarize for the user: contracts registered (id, `matchPath`, baseline SHA), exclusions and
+Summarize for the user: contracts registered (id, `matchPath`, baseline SHA), where the baseline came from
+(the 3.6 release base or current `main`) and that the user confirmed it, exclusions and
 their reasons, the `coverage` result, the local `check` results, and what you could not
 verify (for example CI behavior you cannot run locally). List the decisions you asked about
 and the answers. Offer to commit on a branch; do not open the pull request unless asked.
