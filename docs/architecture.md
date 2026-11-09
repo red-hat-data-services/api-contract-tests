@@ -40,7 +40,7 @@ unpinned tools, and missing required results must not produce a silent pass.
 
 ## Current and follow-on contract types
 
-- OpenAPI compatibility is implemented.
+- OpenAPI compatibility is implemented, for OpenAPI 3 and Swagger 2.0 documents (the latter are converted to OpenAPI 3 first).
 - Static CRD compatibility is implemented.
 - CRD conversion, stored-object migration, and consumer-reliance checks are follow-on work.
 - Protobuf and additional contract types are follow-on work.

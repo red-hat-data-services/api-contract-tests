@@ -69,6 +69,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     check.add_argument("--enforce", action="store_true", help="Exit 1 for breaking changes; default is report-only")
     check.add_argument("--oasdiff", default=os.environ.get("OASDIFF"), help="Pinned oasdiff executable")
     check.add_argument("--yq", default=os.environ.get("YQ"), help="Repository's pinned yq executable")
+    check.add_argument("--swagger2openapi", default=os.environ.get("SWAGGER2OPENAPI"),
+                       help="swagger2openapi converter (build cmd/swagger2openapi); needed only for Swagger 2.0 documents")
 
     crd_check = subparsers.add_parser("crd-check", help="Compare CustomResourceDefinitions with immutable Git baselines")
     crd_check.add_argument("--repo", type=Path, required=True, help="Path to the provider repository to check")

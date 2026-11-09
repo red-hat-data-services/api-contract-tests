@@ -80,6 +80,31 @@ version. Give each a stable `id` and its own `matchPath`; the runner and the
 reusable workflow check one contract at a time (`--contract-id`), so call the
 workflow once per contract (see [step 5](#5-add-ci)).
 
+### Swagger 2.0 documents
+
+A contract can be a Swagger 2.0 document. Declare it like any other contract (`openapi.static`
+for a committed document, or a bundle adapter). oasdiff reads OpenAPI 3 only, so the runner
+converts a Swagger 2.0 baseline and candidate to OpenAPI 3 before comparing them. An OpenAPI 3
+document is never converted, and a contract can move from Swagger 2.0 to OpenAPI 3 between
+the baseline and the candidate.
+
+- **Build the converter.** It is a small Go program, `cmd/swagger2openapi`, built on the same
+  library family as oasdiff (`kin-openapi`), with the dependency pinned in `go.sum`:
+  `go build -C <path-to-api-contract-tests>/cmd/swagger2openapi -o bin/swagger2openapi .`
+  Pass it with `--swagger2openapi` or `SWAGGER2OPENAPI`. It is needed only when a Swagger 2.0
+  document is compared, and the reusable workflow builds it for you.
+- **`matchPath` matches `basePath` plus the path.** A Swagger 2.0 document serves its `paths`
+  below `basePath`, so `basePath: /api/v1` and the path `/widgets` are `/api/v1/widgets` for
+  `matchPath` and in the findings. oasdiff ignores `servers`, so without this a changed
+  `basePath` would move every URL unnoticed; now it appears as removed paths.
+- **`host` and `schemes` are not compared**, like `servers` in an OpenAPI 3 document.
+- **Documents that are not contracts.** A Swagger 2.0 file with no `paths` (for example the
+  definitions generated for an SDK) is not an API contract: list it in `spec.exclusions`
+  with a reason. A document that refers to a definition it does not contain cannot be
+  converted, and the check fails naming the missing definition.
+- **The report** records `dialect` and a `converted` block (including `base_path_prepended`)
+  for each converted document, and the converter version under `tool_build`.
+
 ### Documents that are not contracts
 
 Every OpenAPI document in the repository must be accounted for. If one is
@@ -105,6 +130,9 @@ reads this list.
 GOBIN="$PWD/bin" go install github.com/oasdiff/oasdiff@<version pinned in your descriptor>
 GOBIN="$PWD/bin" go install github.com/mikefarah/yq/v4@<version pinned in your descriptor>
 ```
+
+If a contract is a Swagger 2.0 document, also build the converter (see
+[Swagger 2.0 documents](#swagger-20-documents)).
 
 `checker.py` rejects any other `oasdiff` or `yq` version. For `go install`
 builds that print `main`, it checks the binary's embedded Go module version.

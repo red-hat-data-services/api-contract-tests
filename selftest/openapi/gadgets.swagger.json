@@ -1,0 +1,39 @@
+{
+  "swagger": "2.0",
+  "info": {"title": "Gadgets (Swagger 2.0 self-test fixture)", "version": "1.0"},
+  "basePath": "/api/gadgets/v1",
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "paths": {
+    "/gadgets": {
+      "get": {
+        "operationId": "listGadgets",
+        "parameters": [{"name": "limit", "in": "query", "type": "integer", "format": "int32"}],
+        "responses": {"200": {"description": "A list of gadgets", "schema": {"$ref": "#/definitions/GadgetList"}}}
+      },
+      "post": {
+        "operationId": "createGadget",
+        "parameters": [{"name": "gadget", "in": "body", "required": true, "schema": {"$ref": "#/definitions/Gadget"}}],
+        "responses": {"201": {"description": "Created", "schema": {"$ref": "#/definitions/Gadget"}}}
+      }
+    },
+    "/gadgets/{id}": {
+      "get": {
+        "operationId": "getGadget",
+        "parameters": [{"name": "id", "in": "path", "required": true, "type": "string"}],
+        "responses": {"200": {"description": "A gadget", "schema": {"$ref": "#/definitions/Gadget"}}, "404": {"description": "Not found"}}
+      }
+    }
+  },
+  "definitions": {
+    "Gadget": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {"id": {"type": "string"}, "name": {"type": "string"}}
+    },
+    "GadgetList": {
+      "type": "object",
+      "properties": {"items": {"type": "array", "items": {"$ref": "#/definitions/Gadget"}}}
+    }
+  }
+}

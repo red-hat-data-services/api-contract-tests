@@ -28,6 +28,11 @@ gates. Never describe them as gates.
   `GOBIN="$PWD/bin" go install github.com/oasdiff/oasdiff@v<version>` and
   `github.com/mikefarah/yq/v4@v<version>`. Check whether the provider already has a pinned
   `bin/yq` first.
+- If `discover` reports a document with `dialect: swagger-2.0`, also build the converter oasdiff
+  needs for it: `go build -C $ACT/cmd/swagger2openapi -o "<provider>/bin/swagger2openapi" .`, and
+  pass it to `check` with `--swagger2openapi`. A Swagger 2.0 `matchPath` is matched against
+  `basePath` plus the path. A Swagger 2.0 file with no `paths` (SDK definitions, for example) is
+  not a contract: exclude it with a reason. See `$ACT/docs/onboarding/openapi-compat.md`.
 - Do not edit generated OpenAPI documents by hand. Regenerate them with the provider's own
   command.
 

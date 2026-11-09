@@ -15,3 +15,14 @@ spec:
       generator:
         adapter: openapi.static
         source: selftest/openapi/widgets.yaml
+    # A Swagger 2.0 contract: converted to OpenAPI 3 before it is compared.
+    - id: selftest-gadgets-v1
+      type: openapi
+      declaredArtifact: selftest/openapi/gadgets.swagger.json
+      matchPath: "^/api/gadgets/v1(/|$)"
+      policy:
+        oasdiffVersion: "1.33.0"
+        yqVersion: "4.45.1"
+      generator:
+        adapter: openapi.static
+        source: selftest/openapi/gadgets.swagger.json

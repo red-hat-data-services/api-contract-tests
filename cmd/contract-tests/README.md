@@ -21,6 +21,10 @@ none; see
 [`docs/onboarding`](../../docs/onboarding/README.md#choosing-a-baseline) for why it
 matters.
 
+`check` converts a Swagger 2.0 baseline or candidate to OpenAPI 3 before comparing, using the
+`swagger2openapi` converter (`--swagger2openapi` or `SWAGGER2OPENAPI`; build it from
+[`cmd/swagger2openapi`](../swagger2openapi/README.md)). It is needed only for Swagger 2.0 documents.
+
 Pass `--enforce` in CI and in local runs that should match CI. Without it, `check` and
 `crd-check` record findings and exit 0 (report mode, not recommended).
 

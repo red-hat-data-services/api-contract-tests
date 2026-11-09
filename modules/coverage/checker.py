@@ -369,7 +369,7 @@ def load_document(yq: Path, repo: Path, relative: str) -> Any:
 def path_scope(yq: Path, repo: Path, contract_id: str, artifact: str, match_path: str) -> Document:
     """How many of the artifact's API paths a contract's matchPath leaves unchecked."""
     parsed = load_document(yq, repo, artifact)
-    names = sorted(parsed.get("paths") or {}) if isinstance(parsed, dict) else []
+    names = sorted(openapi.effective_paths(parsed))
     try:
         pattern = re.compile(match_path)
     except re.error as error:
@@ -403,7 +403,7 @@ def describe(yq: Path, repo: Path, relative: str, documents: set[str]) -> Docume
     """Suggest a contract shape for one discovered document (a hint, not a decision)."""
     parsed = load_document(yq, repo, relative)
     info = parsed.get("info") or {} if isinstance(parsed, dict) else {}
-    names = sorted((parsed.get("paths") or {}) if isinstance(parsed, dict) else {})
+    names = sorted(openapi.effective_paths(parsed))
     prefix = common_prefix(names)
     posix = PurePosixPath(relative)
     sibling = posix.parent / "src" / posix.name
@@ -415,6 +415,7 @@ def describe(yq: Path, repo: Path, relative: str, documents: set[str]) -> Docume
         kind = "standalone"
     record: Document = {
         "path": relative, "kind": kind, "title": info.get("title"), "version": info.get("version"),
+        "dialect": "swagger-2.0" if openapi.is_swagger2(parsed) else "openapi-3",
         "paths": len(names), "path_prefix": prefix,
         "suggested_match_path": f"^{re.escape(prefix)}(/|$)" if prefix else ".*",
     }
@@ -575,7 +576,8 @@ def run_discover(args: argparse.Namespace) -> int:
     lines = [f"Discovered in {report['repo']}:", ""]
     lines.append(f"OpenAPI documents ({len(described)}):")
     for item in described:
-        lines.append(f"  {item['kind']:<10} {item['path']}  ({item['paths']} paths, prefix {item['path_prefix'] or '-'})")
+        dialect = ", Swagger 2.0" if item["dialect"] == "swagger-2.0" else ""
+        lines.append(f"  {item['kind']:<10} {item['path']}  ({item['paths']} paths, prefix {item['path_prefix'] or '-'}{dialect})")
     lines.append("")
     lines.append(f"CRD manifests ({len(crds)}):")
     lines.extend(f"  {path}" for path in crds)

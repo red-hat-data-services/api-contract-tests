@@ -10,7 +10,10 @@ inventories a repository that has not been onboarded yet.
 - It also lists per-contract baselines and warns when one is newer than, narrower than, or diverged from the default
   baseline (`--baseline-ref` or `spec.baseline.refs`), each of which loosens protection.
 - `discover` needs no descriptor. It lists the documents, labels each `bundled`,
-  `source`, or `standalone`, and suggests a `matchPath` and generator adapter.
+  `source`, or `standalone`, and suggests a `matchPath` and generator adapter. Each
+  document also has a `dialect` (`openapi-3` or `swagger-2.0`); for Swagger 2.0 the
+  suggested `matchPath` includes the document's `basePath`, because that is how the
+  checker matches paths.
 
 Discovery scans files git knows about (tracked, plus untracked and not
 ignored) and recognizes an OpenAPI document by its top-level `openapi:` or

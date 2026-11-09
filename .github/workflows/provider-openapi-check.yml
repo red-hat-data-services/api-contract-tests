@@ -77,6 +77,11 @@ jobs:
           GOBIN="$PWD/bin" go install "github.com/oasdiff/oasdiff@v$OASDIFF_VERSION"
           GOBIN="$PWD/bin" go install "github.com/mikefarah/yq/v4@v$YQ_VERSION"
 
+      # oasdiff reads OpenAPI 3 only; this converts Swagger 2.0 contracts first. It is built from
+      # the same pinned checkout as the runner, with its dependency pinned in go.sum.
+      - name: Build the Swagger 2.0 converter
+        run: go build -C .contract-tests/cmd/swagger2openapi -o "$PWD/bin/swagger2openapi" .
+
       - name: Run compatibility check
         env:
           CONTRACT_SET: ${{ inputs.contract-set }}
@@ -85,6 +90,7 @@ jobs:
           BASELINE_REFS: ${{ inputs.baseline-refs }}
           OASDIFF: ${{ github.workspace }}/bin/oasdiff
           YQ: ${{ github.workspace }}/bin/yq
+          SWAGGER2OPENAPI: ${{ github.workspace }}/bin/swagger2openapi
         run: python3 .contract-tests/cmd/workflow-steps/steps.py run openapi
 
       - name: Summarize compatibility result

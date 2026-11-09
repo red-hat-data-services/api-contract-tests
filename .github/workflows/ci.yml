@@ -29,6 +29,12 @@ jobs:
           GOBIN="$PWD/bin" go install github.com/oasdiff/oasdiff@v1.33.0
           GOBIN="$PWD/bin" go install github.com/mikefarah/yq/v4@v4.45.1
 
+      - name: Build and test the Swagger 2.0 converter
+        run: |
+          go vet -C cmd/swagger2openapi ./...
+          go test -C cmd/swagger2openapi ./...
+          go build -C cmd/swagger2openapi -o "$PWD/bin/swagger2openapi" .
+
       - name: Install Python test dependencies
         run: |
           python3 -m pip install --upgrade pip
@@ -47,6 +53,7 @@ jobs:
         env:
           OASDIFF: ${{ github.workspace }}/bin/oasdiff
           YQ: ${{ github.workspace }}/bin/yq
+          SWAGGER2OPENAPI: ${{ github.workspace }}/bin/swagger2openapi
         run: |
           python3 -m compileall cmd modules
           python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests cmd/action-pins/tests cmd/workflow-steps/tests cmd/release-baseline/tests -v

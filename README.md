@@ -11,7 +11,7 @@ repository supplies the shared checks and result format.
 
 ## Current status
 
-- The OpenAPI compatibility module is implemented and tested.
+- The OpenAPI compatibility module is implemented and tested, for OpenAPI 3 and Swagger 2.0 contracts.
 - The initial static CRD compatibility module is implemented and tested.
 - The coverage check (`coverage`) confirms every OpenAPI document and CRD in a
   repository is registered; `discover` inventories a repository for onboarding.
@@ -87,6 +87,7 @@ For the consumer side, start with the
 .
 ├── cmd/contract-tests/       # Local runner
 ├── cmd/release-baseline/     # Finds the commit an RHOAI release was based on (baseline SHA)
+├── cmd/swagger2openapi/      # Converts Swagger 2.0 contracts to OpenAPI 3 for oasdiff (Go)
 ├── modules/openapi-compat/   # OpenAPI compatibility engine
 ├── modules/crd-compat/       # Static CRD compatibility engine
 ├── modules/coverage/         # Coverage check and repository discovery
@@ -111,7 +112,7 @@ For the consumer side, start with the
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
-OASDIFF=/path/to/oasdiff YQ=/path/to/yq python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests cmd/action-pins/tests cmd/workflow-steps/tests cmd/release-baseline/tests -v
+OASDIFF=/path/to/oasdiff YQ=/path/to/yq SWAGGER2OPENAPI=/path/to/swagger2openapi python3 -m pytest modules/openapi-compat/tests modules/crd-compat/tests modules/coverage/tests cmd/action-pins/tests cmd/workflow-steps/tests cmd/release-baseline/tests -v
 ```
 
 CI also lints the workflows with [actionlint](https://github.com/rhysd/actionlint)
@@ -137,11 +138,13 @@ The provider workflows keep their logic in `cmd/workflow-steps/steps.py`
 provider workflows end to end on every pull request, against the fixture provider
 in [`selftest/`](selftest/README.md).
 
-The test suite requires `oasdiff` v1.33.0 and `yq` v4.45.1:
+The test suite requires `oasdiff` v1.33.0, `yq` v4.45.1 and the Swagger 2.0 converter:
 
 ```bash
 GOBIN="$PWD/bin" go install github.com/oasdiff/oasdiff@v1.33.0
 GOBIN="$PWD/bin" go install github.com/mikefarah/yq/v4@v4.45.1
+go build -C cmd/swagger2openapi -o "$PWD/bin/swagger2openapi" .
+go test -C cmd/swagger2openapi ./...
 ```
 
 ## License
