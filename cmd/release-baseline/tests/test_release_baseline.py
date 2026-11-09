@@ -453,6 +453,14 @@ def test_every_listed_pair_is_resolved_or_explained():
         assert pairs[repo] == entry["downstream_repo"]
 
 
+def test_readme_documents_every_field_of_the_data_file():
+    data = json.loads((DATA / "3.6.json").read_text())
+    readme = (ROOT / "cmd" / "release-baseline" / "README.md").read_text()
+    fields = set(data) | {key for entry in data["repos"].values() for key in entry}
+    undocumented = sorted(f for f in fields if f"`{f}`" not in readme)
+    assert not undocumented, f"document these fields in cmd/release-baseline/README.md: {undocumented}"
+
+
 def test_lookup_reads_the_checked_in_file_without_a_network():
     def no_network(url, headers):
         raise AssertionError("lookup must not use the network")

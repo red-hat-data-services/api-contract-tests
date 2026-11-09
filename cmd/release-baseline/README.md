@@ -64,6 +64,43 @@ registry. It has not been run against the RHOAI release images: on 2026-11-09 th
 pull credentials used for testing were refused (401) by `quay.io/rhoai` and
 `registry.redhat.io`, so how those images are labeled is unverified.
 
+## Data file format
+
+[`data/release-baselines/3.6.json`](../../data/release-baselines/3.6.json) has these
+top-level fields:
+
+| Field | Meaning |
+|---|---|
+| `release` | The release the data is for, such as `3.6`. `lookup` refuses a file for another release. |
+| `generated` | When `generate` ran (UTC). Every value below is as of that moment. |
+| `method` | How `baseline_sha` is derived, in one sentence. |
+| `repos` | One entry per resolved repository, keyed by the upstream repository (`opendatahub-io/<name>`). |
+| `unresolved` | Repositories with no baseline, each with the reason. Use the SHA that the default branch resolves to. |
+
+Each entry in `repos` (keys are in alphabetical order in the file):
+
+| Field | Meaning |
+|---|---|
+| `baseline_sha` | The value to use as the baseline: the newest commit shared by the downstream release and the upstream default branch (their merge base). It exists in both repositories. |
+| `default_branch` | The upstream branch the release was compared against. |
+| `downstream_repo` | The `red-hat-data-services` repository the release is built from. It differs from the upstream name for renamed repositories such as `rhods-operator`. |
+| `release_ref` | The downstream branch that defines the release, such as `rhoai-3.6`. |
+| `release_sha` | The head of `release_ref` when the file was generated. It is downstream-only, so it is not the baseline; it is kept for provenance and verification. |
+| `relation` | How `release_sha` relates to the upstream default branch (GitHub's compare status). `diverged`: each side has commits the other lacks. `ahead`: the release contains all of the upstream branch plus more, so the baseline is the upstream head. `behind` or `identical`: the release commit is already upstream, so the baseline is the release commit itself. The 3.6 file contains only `diverged` and `ahead`. |
+| `release_only_commits` | Commits in `release_sha` that are not in the upstream default branch: downstream-only work such as bot commits, downstream patches, sync merges and cherry-picks. |
+| `repo_only_commits` | Commits in the upstream default branch that are not in `release_sha`: upstream work not merged downstream. |
+
+For example, `opendatahub-io/MLServer` has `release_only_commits` 309 and
+`repo_only_commits` 56 with relation `diverged`: the 3.6 release has 309 commits that
+upstream `master` lacks, upstream has 56 that the release lacks, and the last commit
+they agree on is the `baseline_sha`.
+
+The commit counts compare SHAs, not content. A change cherry-picked into the release
+has a different SHA from its upstream original, so it is counted on both sides and the
+counts overstate the real difference. For the same reason `baseline_sha` can be older
+than what shipped: a cherry-picked API newer than the baseline is reported as `new`
+(not compared) until the baseline moves.
+
 ## Regenerating the data
 
 [`data/release-baselines/3.6.json`](../../data/release-baselines/3.6.json) is the
