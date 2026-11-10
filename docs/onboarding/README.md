@@ -8,9 +8,10 @@ repository owns:
 | Provider | The canonical OpenAPI document or CRDs, provider behavior tests, and the `ContractSet` descriptor | [Provider checklist](#provider-checklist), then the [OpenAPI](openapi-compat.md) or [CRD](crd-compat.md) guide |
 | Consumer | The reliance profile, consumer-side contract tests, and the CI job that runs them | [Consumer guide](consumer-compat.md) and [Consumer checklist](#consumer-checklist) |
 
-Provider rollout is opt-in: nothing here is a promotion gate, and every check runs
-in `mode: enforce`, so a pull request that breaks a registered contract fails the
-job. Consumer reliance checks are repository-local today; the
+Provider rollout is opt-in: nothing here is a promotion gate, and every check should
+run in `mode: enforce`, so a pull request that breaks a registered contract fails the
+job. The reusable workflows default to `mode: report`, so set `mode: enforce`
+explicitly on every job. Consumer reliance checks are repository-local today; the
 consumer guide records the profile and tests that the follow-on shared verifier
 will adopt.
 
@@ -206,10 +207,15 @@ coverage workflow (and use a full checkout) so this works in CI.
 
 ## Enforce mode
 
-Every job runs in `mode: enforce` (`--enforce` on the command line): a pull request
+Run every job in `mode: enforce` (`--enforce` on the command line): a pull request
 that breaks a registered contract fails the job, on the compatibility job and on the
 coverage job. Report mode (`mode: report`, or `check` without `--enforce`) records
 findings without failing and is not recommended.
+
+Enforce is the recommended mode, not the default. The OpenAPI, CRD, and coverage
+workflows all default `mode` to `report`, and the CLI runs in report mode without
+`--enforce`. A caller that omits `mode` gets a job that stays green on a breaking
+change, so always set `mode: enforce` explicitly.
 
 If the first run fails because the repository already broke its baseline, that is a
 finding, not a reason to use report mode. Fix the break or, for an OpenAPI contract

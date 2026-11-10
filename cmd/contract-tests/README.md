@@ -22,7 +22,9 @@ none; see
 matters.
 
 Pass `--enforce` in CI and in local runs that should match CI. Without it, `check` and
-`crd-check` record findings and exit 0 (report mode, not recommended).
+`crd-check` record findings and exit 0 (report mode, not recommended). Report mode is
+the default here and in the reusable workflows (`mode` defaults to `report`), so
+enforcement only happens when you ask for it.
 
 The same command runs locally and in CI — there is no separate "CI mode" —
 so a result is always reproducible without a cluster. See

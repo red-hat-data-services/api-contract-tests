@@ -201,7 +201,8 @@ Call the reusable workflows from a provider workflow, for example
 `.github/workflows/api-contract.yml`. Reference them by a release tag
 (`@v0.1.0`), by `@stable` or `@latest`, or by a full commit SHA; never by `main`
 or another branch. [Releases and pinning](../releasing.md) explains which to
-choose. Use `mode: enforce`.
+choose. Set `mode: enforce` on every job; the input defaults to `report`, which never
+fails the job.
 
 ```yaml
 name: API contract

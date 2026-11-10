@@ -11,7 +11,8 @@ You are working in (or pointed at) a **provider repository** and have a checkout
 is that checklist as an agent procedure.
 
 Rollout is opt-in, the CI jobs run in **`mode: enforce`** (a pull request that breaks a
-registered contract fails the job), and the checks are pull-request jobs, not promotion
+registered contract fails the job; the reusable workflows default to `report`, so always
+set `mode: enforce` explicitly), and the checks are pull-request jobs, not promotion
 gates. Never describe them as gates.
 
 ## Ground rules

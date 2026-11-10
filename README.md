@@ -16,7 +16,8 @@ repository supplies the shared checks and result format.
 - The coverage check (`coverage`) confirms every OpenAPI document and CRD in a
   repository is registered; `discover` inventories a repository for onboarding.
 - The local runner is `cmd/contract-tests/cli.py`.
-- Provider onboarding is opt-in and runs in enforce mode; see
+- Provider onboarding is opt-in and should run in enforce mode; the reusable
+  workflows default to `mode: report`, so set `mode: enforce` explicitly. See
   [`docs/onboarding`](docs/onboarding/README.md). Providers pin the reusable
   workflows to a release tag (`@v0.1.0`), `@stable`, `@latest` or a full commit
   SHA; see [releases and pinning](docs/releasing.md). Check each provider
