@@ -204,8 +204,8 @@ rule.
 
 Run the consumer tests when consumer code, the reliance profile, the tests, or a
 provider sync changes. Run the job in enforce mode: a failed assertion against the
-pinned provider baseline fails the job. If the job calls a reusable workflow, set
-`mode: enforce` explicitly; the input defaults to `report`. The drift job against provider `main` is
+pinned provider baseline fails the job. Enforce is the default for the reusable
+workflows; keep `mode: enforce` explicit as in the example below. The drift job against provider `main` is
 informational by design.
 
 If the job calls a reusable workflow from `api-contract-tests`, pin it to a

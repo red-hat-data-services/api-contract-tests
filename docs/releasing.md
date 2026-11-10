@@ -25,7 +25,7 @@ Which one to use:
 
 - **Version tag**: the default. One readable string to change when you upgrade,
   and nothing changes under you between upgrades. Use it for enforced checks,
-  which is the recommended mode.
+  which is the default and recommended mode.
 - **`stable`**: no upgrades to make. Your check can start reporting new findings
   after a promotion without a change in your repository, which in enforce mode means
   a pull request can start failing, so prefer a version tag.

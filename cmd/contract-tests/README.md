@@ -9,7 +9,7 @@ python3 cmd/contract-tests/cli.py check \
   --repo /path/to/provider/checkout \
   --contract-set .rhoai/contracts.yaml \
   --baseline-ref <full-git-sha> \
-  --output-dir /tmp/contract-report --enforce \
+  --output-dir /tmp/contract-report \
   [--contract-id <id>] [--oasdiff <path>] [--yq <path>]
 ```
 
@@ -21,10 +21,10 @@ none; see
 [`docs/onboarding`](../../docs/onboarding/README.md#choosing-a-baseline) for why it
 matters.
 
-Pass `--enforce` in CI and in local runs that should match CI. Without it, `check` and
-`crd-check` record findings and exit 0 (report mode, not recommended). Report mode is
-the default here and in the reusable workflows (`mode` defaults to `report`), so
-enforcement only happens when you ask for it.
+`check`, `crd-check`, and `coverage` run in enforce mode by default, as the reusable
+workflows do: a breaking finding or coverage gap exits 1. `--report-only` records
+findings and exits 0 instead (report mode, not recommended); integrity errors still
+fail. `--enforce` is still accepted for compatibility but is no longer needed.
 
 The same command runs locally and in CI — there is no separate "CI mode" —
 so a result is always reproducible without a cluster. See
@@ -37,8 +37,7 @@ python3 cmd/contract-tests/cli.py crd-check \
   --repo /path/to/provider/checkout \
   --crd-glob 'config/crd/**/*.yaml' \
   --baseline-ref <full-git-sha> \
-  --output-dir /tmp/crd-contract-report \
-  --enforce
+  --output-dir /tmp/crd-contract-report
 ```
 
 See [`docs/onboarding/crd-compat.md`](../../docs/onboarding/crd-compat.md).

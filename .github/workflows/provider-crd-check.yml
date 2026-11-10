@@ -8,10 +8,10 @@ on:
         required: true
         type: string
       mode:
-        description: report or enforce
+        description: enforce (default; breaking changes fail the job) or report (not recommended)
         required: false
         type: string
-        default: report
+        default: enforce
       baseline-refs:
         description: Space-separated full Git SHAs
         required: true

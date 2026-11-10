@@ -92,6 +92,7 @@ def test_openapi_args_without_contract_id_or_baselines_in_report_mode():
     env = {"MODE": "report", "CONTRACT_SET": "c.yaml", "CONTRACT_ID": "", "BASELINE_REFS": ""}
     assert steps.check_args("openapi", env, WORKSPACE) == [
         "check", "--repo", "/work/provider", "--contract-set", "c.yaml", "--output-dir", "/work/provider/.contract-report",
+        "--report-only",
     ]
 
 
@@ -99,7 +100,7 @@ def test_crd_args():
     env = {"MODE": "report", "CRD_GLOB": "config/crd/**/*.yaml", "BASELINE_REFS": SHA}
     assert steps.check_args("crd", env, WORKSPACE) == [
         "crd-check", "--repo", "/work/provider", "--crd-glob", "config/crd/**/*.yaml",
-        "--output-dir", "/work/provider/.contract-report", "--baseline-ref", SHA,
+        "--output-dir", "/work/provider/.contract-report", "--baseline-ref", SHA, "--report-only",
     ]
 
 
@@ -121,6 +122,18 @@ def test_coverage_args_keep_globs_unexpanded():
 def test_coverage_in_enforce_mode_is_not_report_only():
     env = {"MODE": "enforce", "CONTRACT_SET": "c.yaml", "RUNNER_TEMP": "/t"}
     assert "--report-only" not in steps.check_args("coverage", env, WORKSPACE)
+
+
+@pytest.mark.parametrize("mode", [None, ""])
+@pytest.mark.parametrize("check", ["openapi", "crd", "coverage"])
+def test_mode_defaults_to_enforce(check, mode):
+    env = {"CONTRACT_SET": "c.yaml", "CRD_GLOB": "x", "RUNNER_TEMP": "/t"}
+    if mode is not None:
+        env["MODE"] = mode
+    args = steps.check_args(check, env, WORKSPACE)
+    assert "--report-only" not in args
+    if check != "coverage":
+        assert args[-1] == "--enforce"
 
 
 @pytest.mark.parametrize("check", ["openapi", "crd", "coverage"])

@@ -36,7 +36,7 @@ Set `baseline-refs` to the SHA chosen in
 release was based on, or the SHA that `main` resolves to today when there is none.
 Note where it came from in a comment next to the input.
 
-Set `mode: enforce`; the input defaults to `report`, which never fails the job. If the first run fails because the repository already broke its
+Use `mode: enforce`, the default; keep it explicit as in the example. If the first run fails because the repository already broke its
 baseline, fix the break or revisit the baseline; do not fall back to `report`.
 
 ## Run locally
@@ -51,7 +51,6 @@ python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/contract-tests/cl
   --repo . \
   --crd-glob 'config/crd/**/*.yaml' \
   --baseline-ref "$baseline_sha" \
-  --enforce \
   --output-dir /tmp/crd-contract-report
 ```
 

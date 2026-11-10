@@ -32,9 +32,9 @@ provider contracts.
 - **Report-only:** compatibility findings are recorded but do not fail the pull request.
 - **Enforce:** breaking findings fail the pull request.
 
-Enforce is the mode every provider should run; report-only is available but not recommended.
-Report-only is still the default: the reusable workflows default `mode` to `report` and the
-CLI needs `--enforce`, so callers must opt in to enforcement explicitly.
+Enforce is the default and the mode every provider should run: the reusable workflows default
+`mode` to `enforce`, and the CLI enforces unless given `--report-only`. Report-only is available
+but not recommended.
 
 Infrastructure and integrity failures fail closed in both modes. Missing
 baselines, digest mismatches, mutable baseline refs, malformed descriptors,
