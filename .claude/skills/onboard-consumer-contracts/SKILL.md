@@ -177,7 +177,8 @@ Add or update a consumer workflow so it runs when consumer code, the reliance
 profile, the tests, or a provider sync changes. Run it in enforce mode, so a failed
 assertion against the pinned provider baseline fails the job; the drift run against
 provider `main` stays informational and non-blocking. If the workflow calls a reusable
-workflow from `api-contract-tests`, pin it to a release tag, `stable`, `latest`, or a
+workflow from `api-contract-tests`, keep `mode: enforce` explicit (it is the default) and
+pin it to a release tag, `stable`, `latest`, or a
 full commit SHA; never a branch. A version tag is the default for an enforced check;
 `@latest` follows the current release automatically and does not suit one.
 

@@ -204,7 +204,8 @@ rule.
 
 Run the consumer tests when consumer code, the reliance profile, the tests, or a
 provider sync changes. Run the job in enforce mode: a failed assertion against the
-pinned provider baseline fails the job. The drift job against provider `main` is
+pinned provider baseline fails the job. Enforce is the default for the reusable
+workflows; keep `mode: enforce` explicit as in the example below. The drift job against provider `main` is
 informational by design.
 
 If the job calls a reusable workflow from `api-contract-tests`, pin it to a
@@ -220,7 +221,7 @@ uses the same wiring.
 jobs:
   openapi:
     name: OpenAPI compatibility vs PR base
-    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-openapi-check.yml@latest
+    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-openapi-check.yml@v0.1.0
     with:
       contract-set: packages/model-registry/.rhoai/contracts.yaml
       contract-id: model-registry-bff-model-catalog-v1

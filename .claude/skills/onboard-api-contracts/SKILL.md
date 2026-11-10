@@ -11,7 +11,8 @@ You are working in (or pointed at) a **provider repository** and have a checkout
 is that checklist as an agent procedure.
 
 Rollout is opt-in, the CI jobs run in **`mode: enforce`** (a pull request that breaks a
-registered contract fails the job), and the checks are pull-request jobs, not promotion
+registered contract fails the job; enforce is the default, and the workflow still sets
+`mode: enforce` explicitly), and the checks are pull-request jobs, not promotion
 gates. Never describe them as gates.
 
 ## Ground rules
@@ -149,7 +150,7 @@ For each contract:
 ```bash
 python3 $ACT/cmd/contract-tests/cli.py check --repo <provider> \
   --contract-set .rhoai/contracts.yaml --contract-id <id> \
-  --baseline-ref <full-sha> --enforce --output-dir /tmp/contract-report-<id>
+  --baseline-ref <full-sha> --output-dir /tmp/contract-report-<id>
 ```
 
 Read `report.json.status`, not just the exit code (`new` means the API is absent at every baseline, so nothing was compared). Typical failures: the committed bundled
@@ -171,7 +172,7 @@ python3 $ACT/cmd/contract-tests/cli.py coverage --repo <provider> [--crd-glob '<
 It must report `Result: complete`. Resolve each `UNCOVERED` document by registering it or
 excluding it with a reason. Do not loosen the check to make it pass.
 
-If the repository ships CRDs, also run `crd-check --enforce` with the glob the workflow will
+If the repository ships CRDs, also run `crd-check` (enforce mode is the default) with the glob the workflow will
 use, and pass that same glob to `coverage --crd-glob`.
 
 ### 5. Prepare CI

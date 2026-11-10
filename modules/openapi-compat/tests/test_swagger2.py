@@ -139,8 +139,8 @@ class Provider:
                 "--yq", str(self.yq), "--baseline-ref", self.baseline, "--output-dir", str(output)]
         if converter:
             args.extend(["--swagger2openapi", str(self.converter)])
-        if enforce:
-            args.append("--enforce")
+        if not enforce:
+            args.append("--report-only")
         result = subprocess.run([sys.executable, str(CLI), "check", *args, *extra], capture_output=True, text=True, timeout=120)
         assert (output / "report.json").is_file(), result.stderr
         return result, json.loads((output / "report.json").read_text()), output

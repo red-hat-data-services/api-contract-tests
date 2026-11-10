@@ -171,16 +171,16 @@ python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/contract-tests/cl
   --repo . \
   --contract-set .rhoai/contracts.yaml \
   --baseline-ref "$baseline_sha" \
-  --enforce \
   --output-dir /tmp/contract-report
 ```
 
 Repeat `--baseline-ref` for every applicable supported-release baseline;
 every supplied baseline is compared independently. Never pass `main`,
-`HEAD`, or an unresolved ref — only full, resolved Git SHAs. `--enforce` makes a
-breaking finding fail the run; it is what the workflows' `mode: enforce` does.
+`HEAD`, or an unresolved ref — only full, resolved Git SHAs. The run is in enforce
+mode by default, so a breaking finding fails it; that is what the workflows'
+`mode: enforce` does.
 
-Read `report.json.status`, not just the exit code: without `--enforce` (report mode,
+Read `report.json.status`, not just the exit code: with `--report-only` (report mode,
 not recommended) the exit code is `0` even when breaking findings are recorded.
 
 ### Baselines
@@ -251,7 +251,8 @@ Call the reusable workflows from a provider workflow, for example
 `.github/workflows/api-contract.yml`. Reference them by a release tag
 (`@v0.1.0`), by `@stable` or `@latest`, or by a full commit SHA; never by `main`
 or another branch. [Releases and pinning](../releasing.md) explains which to
-choose. Use `mode: enforce`.
+choose. Every job runs in `mode: enforce`, the default; keep it explicit as in the
+example below.
 
 ```yaml
 name: API contract
