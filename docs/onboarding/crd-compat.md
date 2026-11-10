@@ -28,7 +28,7 @@ jobs:
     with:
       crd-glob: config/crd/**/*.yaml
       baseline-refs: <full-git-sha>
-      mode: report
+      mode: enforce
 ```
 
 Set `baseline-refs` to the SHA chosen in
@@ -36,8 +36,8 @@ Set `baseline-refs` to the SHA chosen in
 release was based on, or the SHA that `main` resolves to today when there is none.
 Note where it came from in a comment next to the input.
 
-Start in `report` mode, review findings, then move to `enforce` once the
-provider and consumers agree on the policy.
+Use `mode: enforce`, the default; keep it explicit as in the example. If the first run fails because the repository already broke its
+baseline, fix the break or revisit the baseline; do not fall back to `report`.
 
 ## Run locally
 

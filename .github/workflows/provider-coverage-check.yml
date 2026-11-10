@@ -31,10 +31,10 @@ on:
         type: string
         default: ""
       mode:
-        description: report (never fails on gaps) or enforce
+        description: enforce (default; gaps fail the job) or report (never fails on gaps; not recommended)
         required: false
         type: string
-        default: report
+        default: enforce
       yq-version:
         description: Exact mikefarah/yq version declared by the provider descriptor
         required: true

@@ -107,7 +107,7 @@ def require_pinned_ref(env: Mapping[str, str]) -> tuple[int, str]:
 
 
 def _mode(env: Mapping[str, str]) -> str:
-    mode = env.get("MODE", "report")
+    mode = env.get("MODE") or "enforce"
     if mode not in ("report", "enforce"):
         raise InputError(f"mode must be report or enforce, not {mode!r}")
     return mode
@@ -136,13 +136,13 @@ def check_args(check: str, env: Mapping[str, str], workspace: Path) -> list[str]
         if env.get("CONTRACT_ID"):
             args += ["--contract-id", env["CONTRACT_ID"]]
         args += _baseline_args(env)
-        return args + (["--enforce"] if mode == "enforce" else [])
+        return args + (["--enforce"] if mode == "enforce" else ["--report-only"])
     if check == "crd":
         if not env.get("CRD_GLOB"):
             raise InputError("crd-glob is required")
         args = ["crd-check", "--repo", str(workspace), "--crd-glob", env["CRD_GLOB"], "--output-dir", report_dir]
         args += _baseline_args(env)
-        return args + (["--enforce"] if mode == "enforce" else [])
+        return args + (["--enforce"] if mode == "enforce" else ["--report-only"])
     if check == "coverage":
         args = ["coverage", "--repo", str(workspace), "--contract-set", env.get("CONTRACT_SET", "")]
         for glob in env.get("CRD_GLOBS", "").split():
@@ -261,7 +261,7 @@ def coverage_annotations(report: Mapping[str, Any] | None, mode: str) -> list[st
 def annotate_coverage(env: Mapping[str, str]) -> int:
     path = coverage_report(env)
     report = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
-    for line in coverage_annotations(report, env.get("MODE", "report")):
+    for line in coverage_annotations(report, env.get("MODE") or "enforce"):
         print(line)
     # Never fails the job: the coverage step's exit code already decides that.
     return 0

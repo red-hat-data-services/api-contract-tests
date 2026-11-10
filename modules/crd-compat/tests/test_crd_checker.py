@@ -84,7 +84,7 @@ class TestCRDCompatChecker:
     def commit(self, message):
         self.git("commit", "-m", message)
 
-    def check(self, enforce=True, baseline=None):
+    def check(self, enforce=True, baseline=None, extra=()):
         output = self.work / f"report-{len(list(self.work.iterdir()))}"
         args = [
             sys.executable, str(CLI), "crd-check",
@@ -93,8 +93,9 @@ class TestCRDCompatChecker:
             "--baseline-ref", baseline or self.baseline,
             "--output-dir", str(output),
         ]
-        if enforce:
-            args.append("--enforce")
+        if not enforce:
+            args.append("--report-only")
+        args.extend(extra)
         result = subprocess.run(args, capture_output=True, text=True, timeout=30)
         report = json.loads((output / "report.json").read_text())
         return result, report
@@ -141,6 +142,24 @@ class TestCRDCompatChecker:
         assert result.returncode == 0
         assert report["status"] == "breaking"
         assert report["baselines"][0]["findings"]
+
+    def test_enforce_is_the_default_and_the_flag_is_still_accepted(self):
+        self.write(BASE_CRD.replace("enum: [fast, slow]", "enum: [fast]"))
+        result, report = self.check()
+        assert result.returncode == 1
+        assert report["mode"] == "enforce"
+        result, report = self.check(extra=["--enforce"])
+        assert result.returncode == 1
+        assert report["mode"] == "enforce"
+
+    def test_report_only_and_enforce_are_mutually_exclusive(self):
+        output = self.work / "conflict"
+        result = subprocess.run(
+            [sys.executable, str(CLI), "crd-check", "--repo", str(self.repo), "--crd-glob", "config/crd/*.yaml",
+             "--baseline-ref", self.baseline, "--output-dir", str(output), "--enforce", "--report-only"],
+            capture_output=True, text=True, timeout=30)
+        assert result.returncode == 2
+        assert "not allowed with argument" in result.stderr
 
     def test_mutable_baseline_is_rejected(self):
         result, report = self.check(baseline="main")

@@ -1,6 +1,6 @@
 ---
 name: onboard-consumer-contracts
-description: Onboard a consumer repository to the shared RHOAI and ODH API contract checks. Inventories the operations, response fields, status codes, and behavior a consumer relies on; drafts a consumer reliance profile; verifies consumer-side contract tests; and prepares report-mode CI. Use when asked to onboard a consumer, record consumer reliance, or check a consumer against a provider OpenAPI contract.
+description: Onboard a consumer repository to the shared RHOAI and ODH API contract checks. Inventories the operations, response fields, status codes, and behavior a consumer relies on; drafts a consumer reliance profile; verifies consumer-side contract tests; and prepares enforce-mode CI. Use when asked to onboard a consumer, record consumer reliance, or check a consumer against a provider OpenAPI contract.
 ---
 
 # Onboard a consumer repository to the API contract checks
@@ -12,7 +12,7 @@ agent procedure.
 
 The provider owns the canonical contract and provider behavior tests. The
 consumer owns the reliance profile and consumer-side tests. Rollout is opt-in,
-starts in **report** mode, and the consumer check is not a provider merge gate.
+the consumer CI runs in **enforce** mode, and the consumer check is not a provider merge gate.
 
 ## Ground rules
 
@@ -171,14 +171,16 @@ time against the resolved provider `main` SHA as a drift signal and print that
 SHA in the log. A drift failure is a finding to discuss with the provider owner,
 not a reason to weaken the tests.
 
-### 6. Prepare report-mode CI
+### 6. Prepare enforce-mode CI
 
 Add or update a consumer workflow so it runs when consumer code, the reliance
-profile, the tests, or a provider sync changes. Keep it in report mode until the
-owners review the findings. If the workflow calls a reusable workflow from
-`api-contract-tests`, pin it to a release tag, `stable`, `latest`, or a full
-commit SHA; never a branch. `@latest` follows the current release automatically,
-while a version tag is the default once the check is enforced.
+profile, the tests, or a provider sync changes. Run it in enforce mode, so a failed
+assertion against the pinned provider baseline fails the job; the drift run against
+provider `main` stays informational and non-blocking. If the workflow calls a reusable
+workflow from `api-contract-tests`, keep `mode: enforce` explicit (it is the default) and
+pin it to a release tag, `stable`, `latest`, or a
+full commit SHA; never a branch. A version tag is the default for an enforced check;
+`@latest` follows the current release automatically and does not suit one.
 
 Keep the consumer job cluster-free. Do not make a provider pull request run the
 consumer's full end-to-end suite. Upload the test results as an artifact when the
@@ -204,5 +206,5 @@ request unless asked.
 
 Creating or changing the provider descriptor, provider behavior tests, provider
 baselines, or provider CI; implementing a shared consumer runner or profile
-schema; moving a check to enforce mode; and making the check a required branch
-protection are owner decisions for later.
+schema; and making the check a required branch protection are owner decisions
+for later.

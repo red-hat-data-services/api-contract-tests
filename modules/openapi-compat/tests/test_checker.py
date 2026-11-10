@@ -180,8 +180,8 @@ class TestOpenAPICompatChecker:
             args.extend(["--baseline-ref", ref])
         if contract_id:
             args.extend(["--contract-id", contract_id])
-        if enforce:
-            args.append("--enforce")
+        if not enforce:
+            args.append("--report-only")
         result = subprocess.run([sys.executable, str(CLI), "check", *args, *extra],
                                 capture_output=True, text=True, timeout=120)
         assert (output / "report.json").is_file(), result.stderr

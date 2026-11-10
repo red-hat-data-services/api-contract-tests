@@ -16,7 +16,7 @@ the tests that prove that reliance, and the CI that reports drift early.
 |---|---|---|
 | Reliance profile | `.rhoai/consumer-profile.yaml` (proposed) | Names the provider contract, the operations/fields/statuses the consumer uses, and the tests that prove it |
 | Consumer contract tests | Existing test tree, for example `contract-tests/` | Exercises the consumer boundary and validates the provider response against the contract plus explicit behavior assertions |
-| CI job | `.github/workflows/` | Runs the tests on consumer changes and provider syncs in report mode |
+| CI job | `.github/workflows/` | Runs the tests on consumer changes and provider syncs in enforce mode |
 | Registration | Working-group review | Links the provider contract, consumer profile, tests, owner, and support level |
 
 The provider keeps the canonical OpenAPI document and provider behavior tests.
@@ -200,40 +200,41 @@ Do not use a branch name, tag, or `HEAD` as the recorded baseline. The provider
 runner already rejects those refs; the consumer profile should follow the same
 rule.
 
-## 6. Add CI in report mode
+## 6. Add CI in enforce mode
 
 Run the consumer tests when consumer code, the reliance profile, the tests, or a
-provider sync changes. Keep the job in report mode until the findings and the
-support level are reviewed.
+provider sync changes. Run the job in enforce mode: a failed assertion against the
+pinned provider baseline fails the job. Enforce is the default for the reusable
+workflows; keep `mode: enforce` explicit as in the example below. The drift job against provider `main` is
+informational by design.
 
 If the job calls a reusable workflow from `api-contract-tests`, pin it to a
 release tag such as `@v0.1.0`, `@stable`, or `@latest`, or to a full commit SHA.
 Never use a branch. [Releases and pinning](../releasing.md) explains the
-trade-offs. `@latest` follows the current release automatically; a version tag is
-the default when the check is enforced.
+trade-offs. A version tag is the default for an enforced check; `@latest` follows the
+current release automatically and does not suit one.
 
-This is the shape for a new consumer relationship. The Dashboard Model Registry
-job uses the same wiring with `mode: enforce`, because that relationship has
-already been reviewed and adopted.
+This is the shape for a consumer relationship. The Dashboard Model Registry job
+uses the same wiring.
 
 ```yaml
 jobs:
   openapi:
     name: OpenAPI compatibility vs PR base
-    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-openapi-check.yml@latest
+    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-openapi-check.yml@v0.1.0
     with:
       contract-set: packages/model-registry/.rhoai/contracts.yaml
       contract-id: model-registry-bff-model-catalog-v1
       baseline-refs: ${{ github.event.pull_request.base.sha }}
       oasdiff-version: "1.33.0"
       yq-version: "4.45.1"
-      mode: report
+      mode: enforce
 
   upstream-main:
     name: BFF contract vs upstream main
     runs-on: ubuntu-latest
-    # Report mode: a failed assertion annotates the run but does not block a
-    # merge. Remove this once the owners move the relationship to enforce.
+    # Informational by design: drift against upstream main annotates the run but
+    # does not block a merge. A failure is a finding to discuss with the provider owner.
     continue-on-error: true
     steps:
       - uses: actions/checkout@<pinned-sha>
@@ -256,9 +257,8 @@ Once the profile and tests pass locally, provide the working group with:
 - known gaps, exclusions, and behavior that is not covered by tests.
 
 A profile in a consumer repository does not by itself make the relationship part
-of an enforced cohort. Registration and enforcement are separate, reviewed
-decisions. Start in report mode and move to enforce only after the provider and
-consumer owners agree on the policy and the findings are reviewed.
+of the registered cohort. Registration is a separate, reviewed step. Run the CI job
+in enforce mode from the start.
 
 ## 8. Maintain the relationship
 
@@ -284,7 +284,7 @@ consumer owners agree on the policy and the findings are reviewed.
 - [ ] Consumer tests exercise the real consumer boundary and assert the profile's
   fields, statuses, and behavior.
 - [ ] The baseline run is green and records the provider SHA and test command.
-- [ ] CI runs in report mode on consumer changes and provider syncs.
+- [ ] CI runs in enforce mode on consumer changes and provider syncs.
 - [ ] Known gaps and exclusions are explicit.
 - [ ] The relationship is registered with the working group.
 

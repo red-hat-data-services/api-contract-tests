@@ -14,6 +14,8 @@ without a cluster:
       --contract-set .rhoai/contracts.yaml \\
       --baseline-ref <full-git-sha> \\
       --output-dir /tmp/contract-report
+
+Breaking changes fail the run (enforce mode) unless --report-only is given.
 """
 
 import argparse
@@ -50,6 +52,15 @@ def _load_coverage() -> ModuleType:
     return _load_module("coverage_checker", _COVERAGE_PATH)
 
 
+def _add_mode_arguments(subparser: argparse.ArgumentParser) -> None:
+    """Enforce is the default: a breaking change exits 1 unless --report-only is given."""
+    mode = subparser.add_mutually_exclusive_group()
+    mode.add_argument("--report-only", action="store_true",
+                      help="Record breaking changes but exit 0 (not recommended); integrity errors still fail")
+    mode.add_argument("--enforce", action="store_true",
+                      help="Exit 1 for breaking changes. This is the default; the flag is accepted for compatibility")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="contract-tests", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -66,7 +77,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                             "and spec.baseline.refs is used when this is omitted")
     check.add_argument("--output-dir", type=Path, required=True,
                         help="New report directory; existing paths are never overwritten")
-    check.add_argument("--enforce", action="store_true", help="Exit 1 for breaking changes; default is report-only")
+    _add_mode_arguments(check)
     check.add_argument("--oasdiff", default=os.environ.get("OASDIFF"), help="Pinned oasdiff executable")
     check.add_argument("--yq", default=os.environ.get("YQ"), help="Repository's pinned yq executable")
 
@@ -77,7 +88,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                            help="Full resolved Git SHA; repeat for every supported baseline. Mutable refs are rejected.")
     crd_check.add_argument("--output-dir", type=Path, required=True,
                            help="New report directory; existing paths are never overwritten")
-    crd_check.add_argument("--enforce", action="store_true", help="Exit 1 for breaking changes; default is report-only")
+    _add_mode_arguments(crd_check)
 
     coverage = subparsers.add_parser(
         "coverage",
@@ -111,6 +122,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     discover.add_argument("--yq", default=os.environ.get("YQ"), help="Pinned yq executable")
 
     args = parser.parse_args(argv)
+    if args.command in ("check", "crd-check"):
+        args.enforce = not args.report_only
     # The checker modules are loaded at runtime, so their return values are untyped here.
     code: int
     if args.command == "coverage":

@@ -16,7 +16,8 @@ repository supplies the shared checks and result format.
 - The coverage check (`coverage`) confirms every OpenAPI document and CRD in a
   repository is registered; `discover` inventories a repository for onboarding.
 - The local runner is `cmd/contract-tests/cli.py`.
-- Provider onboarding is opt-in and starts in report mode; see
+- Provider onboarding is opt-in and runs in enforce mode, the default for the
+  reusable workflows and the CLI; see
   [`docs/onboarding`](docs/onboarding/README.md). Providers pin the reusable
   workflows to a release tag (`@v0.1.0`), `@stable`, `@latest` or a full commit
   SHA; see [releases and pinning](docs/releasing.md). Check each provider
@@ -38,9 +39,10 @@ python3 /path/to/api-contract-tests/cmd/contract-tests/cli.py check \
   --output-dir /tmp/contract-report
 ```
 
-Read `report.json.status`, not only the process exit code. Report-only mode
-records breaking findings without failing the build; infrastructure and
-integrity errors still fail closed.
+Read `report.json.status`, not only the process exit code. Enforce mode is the
+default and the recommended mode (the workflows' `mode: enforce`): a breaking finding
+fails the run. With `--report-only` the findings are recorded and the run still exits
+0 (report mode, not recommended). Infrastructure and integrity errors fail closed either way.
 
 Every check pins `oasdiff` and `yq` in the provider descriptor and resolves
 each baseline to a full Git SHA. Mutable refs such as `main`, `HEAD`, tags,
