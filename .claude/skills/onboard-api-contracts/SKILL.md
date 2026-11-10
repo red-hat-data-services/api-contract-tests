@@ -30,8 +30,11 @@ gates. Never describe them as gates.
   `bin/yq` first.
 - If `discover` reports a document with `dialect: swagger-2.0`, also build the converter oasdiff
   needs for it: `go build -C $ACT/cmd/swagger2openapi -o "<provider>/bin/swagger2openapi" .`, and
-  pass it to `check` with `--swagger2openapi`. A Swagger 2.0 `matchPath` is matched against
-  `basePath` plus the path. A Swagger 2.0 file with no `paths` (SDK definitions, for example) is
+  pass it to `check` with `--swagger2openapi`.
+- `matchPath` is matched against the full URL path: the base path (Swagger `basePath`, or the
+  path of the OpenAPI 3 `servers` URLs) plus the path. If `discover` reports a
+  `base_path_error` (servers with different paths), raise it with the owner; the check fails
+  until the servers agree. A Swagger 2.0 file with no `paths` (SDK definitions, for example) is
   not a contract: exclude it with a reason. See `$ACT/docs/onboarding/openapi-compat.md`.
 - Do not edit generated OpenAPI documents by hand. Regenerate them with the provider's own
   command.

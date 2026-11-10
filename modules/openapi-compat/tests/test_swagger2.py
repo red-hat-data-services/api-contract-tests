@@ -273,6 +273,78 @@ def test_migrating_a_contract_from_swagger_2_to_openapi_3_is_compatible(provider
 
 # ---- failures are explicit ---------------------------------------------------------------
 
+def standard_openapi3(provider, servers):
+    """The contract as an OpenAPI 3 document written the usual way: base path in servers, paths unprefixed."""
+    _, report, output = provider.check()
+    document = json.loads((output / report["baselines"][0]["compare_file"]).read_text())
+    document["servers"] = servers
+    document["paths"] = {name.removeprefix("/api/v1"): item for name, item in document["paths"].items()}
+    return document
+
+
+@pytest.mark.parametrize("servers", [
+    [{"url": "/api/v1"}],
+    [{"url": "https://api.example.com/api/v1/"}],
+    [{"url": "https://{host}/{base}", "variables": {"host": {"default": "api.example.com"},
+                                                   "base": {"default": "api/v1"}}}],
+    [{"url": "https://api.example.com/api/v1"}, {"url": "http://localhost:8080/api/v1"}],
+], ids=["relative", "absolute", "variables", "several-servers-same-path"])
+def test_standard_openapi_3_migration_with_the_base_path_in_servers_is_compatible(provider, servers):
+    """Regression: the servers path is folded into the paths, as basePath is for Swagger 2.0."""
+    provider.write(standard_openapi3(provider, servers))
+    result, report, output = provider.check()
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert report["status"] == "compatible"
+    assert report["candidate"]["dialect"] == "openapi-3"
+    assert report["candidate"]["canonicalized"]["base_path_prepended"] == "/api/v1"
+    compared = json.loads((output / report["candidate"]["compare_file"]).read_text())
+    assert sorted(compared["paths"]) == ["/api/v1/widgets", "/api/v1/widgets/{id}"]
+
+
+def test_breaking_change_is_still_caught_across_the_migration(provider):
+    document = standard_openapi3(provider, [{"url": "/api/v1"}])
+    del document["paths"]["/widgets/{id}"]
+    provider.write(document)
+    result, report, _ = provider.check()
+    assert result.returncode == 1
+    assert [f["id"] for f in report["baselines"][0]["findings"]] == ["api-path-removed-without-deprecation"]
+
+
+def test_changed_openapi_3_servers_path_is_breaking(tmp_path):
+    original = {"openapi": "3.0.3", "info": {"title": "W", "version": "1"}, "servers": [{"url": "/api/v1"}],
+                "paths": {"/widgets": {"get": {"responses": {"200": {"description": "ok"}}}}}}
+    provider = Provider(tmp_path, artifact="api/openapi.json", match_path="^/api/", document=original)
+    provider.write(dict(original, servers=[{"url": "/api/v2"}]))
+    result, report, _ = provider.check()
+    assert result.returncode == 1
+    assert report["baselines"][0]["canonicalized"]["base_path_prepended"] == "/api/v1"
+    assert report["candidate"]["canonicalized"]["base_path_prepended"] == "/api/v2"
+    assert "api-path-removed-without-deprecation" in [f["id"] for f in report["baselines"][0]["findings"]]
+
+
+def test_openapi_3_servers_without_a_path_are_compared_unchanged(tmp_path):
+    document = {"openapi": "3.0.3", "info": {"title": "W", "version": "1"},
+                "servers": [{"url": "https://api.example.com"}, {"url": "http://localhost:8080/"}],
+                "paths": {"/api/v1/widgets": {"get": {"responses": {"200": {"description": "ok"}}}}}}
+    provider = Provider(tmp_path, artifact="api/openapi.json", document=document)
+    result, report, _ = provider.check()
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "canonicalized" not in report["candidate"]
+    assert report["candidate"]["compare_file"] == "candidate.yaml"
+
+
+def test_servers_with_different_paths_are_a_clear_error(tmp_path):
+    document = {"openapi": "3.0.3", "info": {"title": "W", "version": "1"},
+                "servers": [{"url": "/api/v1"}, {"url": "https://api.example.com/v1"}],
+                "paths": {"/widgets": {"get": {"responses": {"200": {"description": "ok"}}}}}}
+    provider = Provider(tmp_path, artifact="api/openapi.json", match_path=".*", document=document)
+    result, report, _ = provider.check()
+    assert result.returncode == 2
+    assert report["status"] == "error"
+    assert "'/api/v1', 'https://api.example.com/v1'" in report["errors"][0]
+    assert "no single base path" in report["errors"][0]
+
+
 def test_missing_converter_is_a_clear_error(provider):
     result, report, _ = provider.check(converter=False, extra=["--swagger2openapi", str(provider.work / "nope")])
     assert result.returncode == 2
@@ -320,9 +392,29 @@ def test_effective_paths():
     assert sorted(runner.effective_paths(swagger)) == ["/api/v1/a", "/api/v1/b/{id}"]
     openapi3 = {"openapi": "3.0.3", "basePath": "/ignored", "paths": {"/a": {}}}
     assert runner.effective_paths(openapi3) == ["/a"]
+    openapi3 = {"openapi": "3.0.3", "servers": [{"url": "https://h/api/v1"}], "paths": {"/a": {}}}
+    assert runner.effective_paths(openapi3) == ["/api/v1/a"]
     assert runner.effective_paths({"swagger": "2.0"}) == []
     assert runner.effective_paths({"swagger": "2.0", "paths": []}) == []
     assert runner.effective_paths("not a document") == []
+
+
+@pytest.mark.parametrize("servers,expected", [
+    (None, ""), ([], ""), ([{"url": "/"}], ""), ([{"url": "https://h"}], ""), ([{"url": "https://h:8443/"}], ""),
+    ([{"url": "/api/v1"}], "/api/v1"), ([{"url": "api/v1/"}], "/api/v1"), ([{"url": "//h/api/v1"}], "/api/v1"),
+    ([{"url": "https://h/api/v1?x=1"}], "/api/v1"),
+    ([{"url": "{scheme}://h/{v}", "variables": {"scheme": {"default": "https"}, "v": {"default": "v2"}}}], "/v2"),
+    ([{"url": "https://a/api"}, {"url": "http://b/api/"}], "/api"),
+    ([{"description": "no url"}, "junk", {"url": "/api"}], "/api"),
+])
+def test_openapi3_base_path(servers, expected):
+    document = {"openapi": "3.0.3"} if servers is None else {"openapi": "3.0.3", "servers": servers}
+    assert runner.openapi3_base_path(document) == expected
+
+
+def test_openapi3_servers_that_disagree_have_no_base_path():
+    with pytest.raises(runner.CheckError, match="different URL paths"):
+        runner.openapi3_base_path({"openapi": "3.0.3", "servers": [{"url": "/v1"}, {"url": "/v2"}]})
 
 
 # ---- discover ---------------------------------------------------------------------------------
@@ -336,3 +428,16 @@ def test_discover_suggests_a_match_path_that_includes_the_base_path(provider):
     assert document["suggested_match_path"].startswith("^/api/v1")
     # And the suggestion really matches what the checker will compare.
     assert runner.document_serves(SWAGGER, document["suggested_match_path"])
+
+
+def test_discover_reports_servers_that_disagree_without_aborting(provider):
+    document = {"openapi": "3.0.3", "info": {"title": "W", "version": "1"},
+                "servers": [{"url": "/v1"}, {"url": "/v2"}], "paths": {"/widgets": {}}}
+    provider.write(document, relative="api/openapi.json")
+    result = subprocess.run([sys.executable, str(CLI), "discover", "--repo", str(provider.repo), "--format", "json"],
+                            capture_output=True, text=True, env=dict(os.environ, YQ=str(provider.yq)), timeout=120)
+    assert result.returncode == 0, result.stderr
+    documents = {d["path"]: d for d in json.loads(result.stdout)["openapi"]}
+    assert "different URL paths" in documents["api/openapi.json"]["base_path_error"]
+    assert documents["api/openapi.json"]["suggested_match_path"] == ".*"
+    assert documents["api/swagger.json"]["suggested_match_path"].startswith("^/api/v1")

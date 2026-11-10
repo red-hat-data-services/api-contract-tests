@@ -18,6 +18,10 @@ the same finding shape.
 - **Swagger 2.0 support** — `checker.py` converts a Swagger 2.0 baseline or candidate to OpenAPI 3
   with [`cmd/swagger2openapi`](../../cmd/swagger2openapi/README.md) before running oasdiff, which reads
   OpenAPI 3 only. See [Swagger 2.0 documents](../../docs/onboarding/openapi-compat.md#swagger-20-documents).
+- **Base paths** — both dialects are compared with their base path (Swagger `basePath`, or the
+  path of the OpenAPI 3 `servers`) folded into the paths, so a contract can move between
+  dialects and a changed base path is caught. See
+  [Base paths](../../docs/onboarding/openapi-compat.md#base-paths).
 - **`tests/test_swagger2.py`** — tests of the Swagger 2.0 path against the real converter and oasdiff.
 - **`tests/test_checker.py`** — regression tests against a synthetic fixture
   repository, so this module's own tests never depend on a real provider.
