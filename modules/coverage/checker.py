@@ -369,7 +369,7 @@ def load_document(yq: Path, repo: Path, relative: str) -> Any:
 def path_scope(yq: Path, repo: Path, contract_id: str, artifact: str, match_path: str) -> Document:
     """How many of the artifact's API paths a contract's matchPath leaves unchecked."""
     parsed = load_document(yq, repo, artifact)
-    names = sorted(parsed.get("paths") or {}) if isinstance(parsed, dict) else []
+    names = sorted(openapi.effective_paths(parsed))
     try:
         pattern = re.compile(match_path)
     except re.error as error:
@@ -403,8 +403,15 @@ def describe(yq: Path, repo: Path, relative: str, documents: set[str]) -> Docume
     """Suggest a contract shape for one discovered document (a hint, not a decision)."""
     parsed = load_document(yq, repo, relative)
     info = parsed.get("info") or {} if isinstance(parsed, dict) else {}
-    names = sorted((parsed.get("paths") or {}) if isinstance(parsed, dict) else {})
-    prefix = common_prefix(names)
+    base_path_error = None
+    try:
+        names = sorted(openapi.effective_paths(parsed))
+    except CheckError as error:
+        # discover is a hint: report the problem and keep inventorying the other documents.
+        base_path_error = str(error)
+        paths = parsed.get("paths") if isinstance(parsed, dict) else None
+        names = sorted(name for name in paths if isinstance(name, str)) if isinstance(paths, dict) else []
+    prefix = common_prefix(names) if base_path_error is None else ""
     posix = PurePosixPath(relative)
     sibling = posix.parent / "src" / posix.name
     if sibling.as_posix() in documents:
@@ -415,9 +422,12 @@ def describe(yq: Path, repo: Path, relative: str, documents: set[str]) -> Docume
         kind = "standalone"
     record: Document = {
         "path": relative, "kind": kind, "title": info.get("title"), "version": info.get("version"),
+        "dialect": "swagger-2.0" if openapi.is_swagger2(parsed) else "openapi-3",
         "paths": len(names), "path_prefix": prefix,
         "suggested_match_path": f"^{re.escape(prefix)}(/|$)" if prefix else ".*",
     }
+    if base_path_error:
+        record["base_path_error"] = base_path_error
     if kind == "bundled":
         record["suggested_generator"] = {
             "adapter": "openapi.bundle.yq-merge", "sourceDir": sibling.parent.as_posix(),
@@ -575,7 +585,10 @@ def run_discover(args: argparse.Namespace) -> int:
     lines = [f"Discovered in {report['repo']}:", ""]
     lines.append(f"OpenAPI documents ({len(described)}):")
     for item in described:
-        lines.append(f"  {item['kind']:<10} {item['path']}  ({item['paths']} paths, prefix {item['path_prefix'] or '-'})")
+        dialect = ", Swagger 2.0" if item["dialect"] == "swagger-2.0" else ""
+        lines.append(f"  {item['kind']:<10} {item['path']}  ({item['paths']} paths, prefix {item['path_prefix'] or '-'}{dialect})")
+        if item.get("base_path_error"):
+            lines.append(f"    warning: {item['base_path_error']}")
     lines.append("")
     lines.append(f"CRD manifests ({len(crds)}):")
     lines.extend(f"  {path}" for path in crds)

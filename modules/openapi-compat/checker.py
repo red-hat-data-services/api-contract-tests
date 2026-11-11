@@ -3,7 +3,8 @@
 Loads a provider's ContractSet descriptor (see ../../schemas/contract-set.schema.json),
 generates a fresh candidate using the descriptor's declared generator adapter
 (adapters.py), resolves every baseline by exact Git SHA, and runs pinned
-oasdiff checks scoped to the selected contract.
+oasdiff checks scoped to the selected contract. Swagger 2.0 documents are converted to
+OpenAPI 3 first (see convert_swagger2), because oasdiff reads OpenAPI 3 only.
 
 This module is provider-agnostic: no Model Catalog-specific paths, tool
 versions, or bundling scripts live here. All of that comes from the
@@ -19,6 +20,7 @@ import re
 import shutil
 import subprocess
 import sys
+import urllib.parse
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from types import ModuleType
@@ -123,12 +125,157 @@ def digest(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def parse_document(yq: Path, path: Path, cwd: Path) -> Any:
+    """Parse a YAML or JSON OpenAPI or Swagger document."""
+    try:
+        return json.loads(command([yq, "eval", "-o=json", ".", str(path)], cwd=cwd).stdout)
+    except json.JSONDecodeError as error:
+        raise CheckError(f"Cannot parse {Path(path).name}: {error}") from error
+
+
+def is_swagger2(document: Any) -> bool:
+    """True for a Swagger 2.0 document.
+
+    ``swagger: 2.0`` written without quotes parses as a number, so both forms count.
+    """
+    return isinstance(document, dict) and str(document.get("swagger", "")).strip() in ("2", "2.0")
+
+
+def swagger_base_path(document: Any) -> str:
+    """A Swagger 2.0 basePath as a path prefix without a trailing slash; empty for none or ``/``."""
+    base = document.get("basePath") if isinstance(document, dict) else None
+    if not isinstance(base, str) or base.strip() in ("", "/"):
+        return ""
+    return "/" + base.strip().strip("/")
+
+
+def _normalize_base_path(path: str) -> str:
+    path = path.strip().strip("/")
+    return "/" + path if path else ""
+
+
+def openapi3_base_path(document: Any) -> str:
+    """The URL path an OpenAPI 3 document's top-level ``servers`` share; empty for none or ``/``.
+
+    Server variables are replaced by their defaults, and only the path part of a server URL
+    counts: ``https://example.com:8443/api/v1`` and ``/api/v1`` both give ``/api/v1``. Servers
+    that disagree on the path have no single base path, which is an error: comparing either
+    one could report every route as removed. Path- and operation-level ``servers`` are not
+    considered.
+    """
+    servers = document.get("servers") if isinstance(document, dict) else None
+    if not isinstance(servers, list):
+        return ""
+    bases: dict[str, str] = {}
+    for server in servers:
+        if not isinstance(server, dict) or not isinstance(server.get("url"), str):
+            continue
+        url = server["url"]
+        variables = server.get("variables")
+        for name, variable in (variables.items() if isinstance(variables, dict) else ()):
+            if isinstance(variable, dict) and "default" in variable:
+                url = url.replace("{" + str(name) + "}", str(variable["default"]))
+        path = urllib.parse.urlsplit(url).path if "://" in url or url.startswith("//") else url.split("?")[0]
+        bases.setdefault(_normalize_base_path(path), server["url"])
+    if len(bases) > 1:
+        listed = ", ".join(repr(url) for url in bases.values())
+        raise CheckError(
+            f"The servers in this OpenAPI 3 document have different URL paths ({listed}), so it has no single "
+            "base path to compare its paths under. Make every server use the same path, or move the "
+            "difference into the paths"
+        )
+    return next(iter(bases), "")
+
+
+def base_path(document: Any) -> str:
+    """The path prefix a document serves its ``paths`` below, in either dialect."""
+    return swagger_base_path(document) if is_swagger2(document) else openapi3_base_path(document)
+
+
+def effective_paths(document: Any) -> list[str]:
+    """The URL paths a document serves, which is what a contract's matchPath is matched against.
+
+    Both dialects serve their ``paths`` below a base path: ``basePath`` in Swagger 2.0, the path
+    of the ``servers`` URLs in OpenAPI 3. The base path is part of the path, so a document keeps
+    the same effective paths when it moves from one dialect to the other. Prepending it also
+    makes a changed base path visible to oasdiff as removed paths: oasdiff ignores ``servers``
+    (and so ``basePath`` after conversion), so it would otherwise miss a change that moves
+    every URL.
+    """
+    paths = document.get("paths") if isinstance(document, dict) else None
+    if not isinstance(paths, dict):
+        return []
+    prefix = base_path(document)
+    return [prefix + name for name in paths if isinstance(name, str)]
+
+
+def document_serves(document: Any, pattern: str) -> bool:
+    return any(re.match(pattern, name) for name in effective_paths(document))
+
+
 def spec_has_paths(yq: Path, path: Path, cwd: Path, pattern: str) -> bool:
-    parsed = json.loads(command([yq, "eval", "-o=json", ".", str(path)], cwd=cwd).stdout)
-    paths = parsed.get("paths") if isinstance(parsed, dict) else None
-    return isinstance(paths, dict) and any(
-        isinstance(name, str) and re.match(pattern, name) for name in paths
-    )
+    return document_serves(parse_document(yq, path, cwd), pattern)
+
+
+def convert_swagger2(document: Any, source: Path, dest: Path, converter: Path, cwd: Path) -> Document:
+    """Write an OpenAPI 3 conversion of a Swagger 2.0 document and describe it for the report.
+
+    oasdiff reads OpenAPI 3 only. The conversion is done by the swagger2openapi tool built
+    from cmd/swagger2openapi, which uses the same library family as oasdiff. The Swagger
+    basePath is folded into the path keys first (see effective_paths). A document that cannot
+    be converted, for example one with a dangling reference, is an error, never a partial result.
+    """
+    paths = document.get("paths") or {}
+    if not isinstance(paths, dict):
+        raise CheckError(f"Cannot convert {source.name}: paths must be a mapping")
+    prefix = swagger_base_path(document)
+    prepared = {key: value for key, value in document.items() if key != "basePath"}
+    prepared["swagger"] = "2.0"
+    prepared["paths"] = {prefix + name: item for name, item in paths.items()}
+    staged = dest.parent / f"{dest.name}.input.json"
+    staged.write_text(json.dumps(prepared, indent=2) + "\n", encoding="utf-8")
+    result = command([converter, staged], cwd=cwd, check=False)
+    if result.returncode:
+        raise CheckError(
+            f"Cannot convert the Swagger 2.0 document {source.name} to OpenAPI 3: "
+            f"{(result.stderr or result.stdout).strip()}"
+        )
+    dest.write_text(result.stdout, encoding="utf-8")
+    return {"from": "swagger-2.0", "to": "openapi-3", "base_path_prepended": prefix or None,
+            "file": dest.name, "sha256": digest(dest)}
+
+
+def canonicalize_openapi3(document: Any, source: Path, dest: Path) -> Document | None:
+    """Write a copy of an OpenAPI 3 document with its servers' base path folded into the paths.
+
+    This puts it in the same path space as a converted Swagger 2.0 document (see effective_paths),
+    so a contract can move between dialects, and a changed servers path shows up as removed
+    paths. Returns None, and writes nothing, when the document has no base path to fold.
+    """
+    prefix = openapi3_base_path(document)
+    if not prefix:
+        return None
+    paths = document.get("paths") or {}
+    if not isinstance(paths, dict):
+        raise CheckError(f"Cannot read {source.name}: paths must be a mapping")
+    prepared = dict(document)
+    prepared["paths"] = {prefix + name: item for name, item in paths.items()}
+    dest.write_text(json.dumps(prepared, indent=2) + "\n", encoding="utf-8")
+    return {"base_path_prepended": prefix, "file": dest.name, "sha256": digest(dest)}
+
+
+def prepare_for_comparison(document: Any, source: Path, stem: str, output: Path,
+                           converter: Any) -> tuple[Path, str, Document | None, Document | None]:
+    """The file oasdiff compares for one document: a conversion, a canonical copy, or the source.
+
+    Returns ``(compare_file, dialect, converted, canonicalized)``.
+    """
+    if is_swagger2(document):
+        dest = output / f"{stem}.openapi3.json"
+        return dest, "swagger-2.0", convert_swagger2(document, source, dest, converter(), output), None
+    dest = output / f"{stem}.canonical.json"
+    canonicalized = canonicalize_openapi3(document, source, dest)
+    return (dest if canonicalized else source), "openapi-3", None, canonicalized
 
 
 def findings(result: subprocess.CompletedProcess[str], operation: str) -> list[Document]:
@@ -314,6 +461,23 @@ def check_compatibility(args: argparse.Namespace, output: Path, report: Document
         "severity_overrides": severity_overrides, "fail_on": "WARN", "match_path": match_path,
     }
 
+    converter: list[Path] = []
+
+    def get_converter() -> Path:
+        """Find the Swagger 2.0 converter once, and only when a Swagger 2.0 document needs it."""
+        if not converter:
+            try:
+                path = tool_path("swagger2openapi", getattr(args, "swagger2openapi", None), repo)
+            except CheckError as error:
+                raise CheckError(
+                    "A Swagger 2.0 document needs the swagger2openapi converter, and it was not found. Build it "
+                    "with `go build -C <api-contract-tests>/cmd/swagger2openapi -o <provider>/bin/swagger2openapi .` "
+                    "or pass --swagger2openapi (see docs/onboarding/openapi-compat.md)"
+                ) from error
+            report["tool_build"]["swagger2openapi"] = command([path, "--version"], cwd=output).stdout.strip()
+            converter.append(path)
+        return converter[0]
+
     baselines, baseline_artifact, explicit = contract_baselines(args, descriptor, contract)
     for ref, _ in baselines:
         validate_baseline_ref(ref)
@@ -348,13 +512,22 @@ def check_compatibility(args: argparse.Namespace, output: Path, report: Document
         baseline = output / f"baseline-{sha}.yaml"
         raw = command(["git", "--no-replace-objects", "show", f"{sha}:{baseline_path}"], cwd=repo).stdout
         baseline.write_text(raw, encoding="utf-8")
-        if not spec_has_paths(yq, baseline, output, match_path):
+        baseline_document = parse_document(yq, baseline, output)
+        if not document_serves(baseline_document, match_path):
             raise CheckError(f"Baseline {ref!r} has no paths matching {match_path!r}; wrong API/version")
-        validation = validate_spec(oasdiff, policy_file, baseline, output)
-        report["baselines"].append({
+        compare_file, dialect, converted, canonicalized = prepare_for_comparison(
+            baseline_document, baseline, f"baseline-{sha}", output, get_converter)
+        validation = validate_spec(oasdiff, policy_file, compare_file, output)
+        entry: Document = {
             "ref": ref, "sha": sha, "source": source, "status": "compared", "file": baseline.name,
-            "sha256": digest(baseline), "validation_findings": validation,
-        })
+            "sha256": digest(baseline), "dialect": dialect,
+            "compare_file": compare_file.name, "validation_findings": validation,
+        }
+        if converted:
+            entry["converted"] = converted
+        if canonicalized:
+            entry["canonicalized"] = canonicalized
+        report["baselines"].append(entry)
 
     candidate = output / "candidate.yaml"
     generator = contract.get("generator") or descriptor.get("spec", {}).get("candidate", {}).get("generator")
@@ -369,7 +542,16 @@ def check_compatibility(args: argparse.Namespace, output: Path, report: Document
     }
     if candidate.read_bytes() != (repo / declared_artifact).read_bytes():
         raise CheckError(f"Stale committed {declared_artifact}; regenerate it before committing")
-    report["candidate"]["validation_findings"] = validate_spec(oasdiff, policy_file, candidate, output)
+    candidate_document = parse_document(yq, candidate, output)
+    candidate_compare, dialect, converted, canonicalized = prepare_for_comparison(
+        candidate_document, candidate, "candidate", output, get_converter)
+    report["candidate"]["dialect"] = dialect
+    if converted:
+        report["candidate"]["converted"] = converted
+    if canonicalized:
+        report["candidate"]["canonicalized"] = canonicalized
+    report["candidate"]["compare_file"] = candidate_compare.name
+    report["candidate"]["validation_findings"] = validate_spec(oasdiff, policy_file, candidate_compare, output)
 
     breaking = False
     compared = [baseline for baseline in report["baselines"] if baseline["status"] == "compared"]
@@ -380,7 +562,7 @@ def check_compatibility(args: argparse.Namespace, output: Path, report: Document
             cmd.append("--flatten-allof")
         if match_path and match_path != ".*":
             cmd.extend(["--match-path", match_path])
-        cmd.extend(["--fail-on", "WARN", "--format", "json", output / baseline["file"], candidate])
+        cmd.extend(["--fail-on", "WARN", "--format", "json", output / baseline["compare_file"], candidate_compare])
         result = command(cmd, cwd=output, check=False)
         baseline["findings"] = findings(result, "breaking")
         baseline["compatible"] = result.returncode == 0

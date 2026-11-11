@@ -9,6 +9,7 @@ own pull request instead of first running when a provider bumps its pin.
 | --- | --- |
 | `contracts.yaml` | OpenAPI and coverage checks (ContractSet descriptor) |
 | `openapi/widgets.yaml` | OpenAPI check (`openapi.static` contract) |
+| `openapi/gadgets.swagger.json` | OpenAPI check of a Swagger 2.0 contract (converted to OpenAPI 3 first) |
 | `crd/widgets.yaml` | CRD and coverage checks |
 
 Each check compares against the pull request's base commit (or the previous

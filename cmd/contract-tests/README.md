@@ -21,6 +21,10 @@ none; see
 [`docs/onboarding`](../../docs/onboarding/README.md#choosing-a-baseline) for why it
 matters.
 
+`check` converts a Swagger 2.0 baseline or candidate to OpenAPI 3 before comparing, using the
+`swagger2openapi` converter (`--swagger2openapi` or `SWAGGER2OPENAPI`; build it from
+[`cmd/swagger2openapi`](../swagger2openapi/README.md)). It is needed only for Swagger 2.0 documents.
+
 `check`, `crd-check`, and `coverage` run in enforce mode by default, as the reusable
 workflows do: a breaking finding or coverage gap exits 1. `--report-only` records
 findings and exits 0 instead (report mode, not recommended); integrity errors still

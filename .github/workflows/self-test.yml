@@ -13,9 +13,15 @@ permissions:
 
 jobs:
   openapi:
+    strategy:
+      fail-fast: false
+      matrix:
+        # The second contract is a Swagger 2.0 document, so the converter step runs end to end.
+        contract-id: [selftest-widgets-v1, selftest-gadgets-v1]
     uses: ./.github/workflows/provider-openapi-check.yml
     with:
       contract-set: selftest/contracts.yaml
+      contract-id: ${{ matrix.contract-id }}
       mode: enforce
       baseline-refs: ${{ github.event.pull_request.base.sha || github.event.before }}
       oasdiff-version: "1.33.0"

@@ -36,7 +36,9 @@ repository supplies the runner, schemas, and reusable workflows.
    `discover` lists every OpenAPI document and CRD manifest, labels each one
    `bundled` (generated from a `src/` sibling), `source` (a bundle input), or
    `standalone` (hand-maintained), and suggests a `matchPath` and generator for
-   each. These are hints, not decisions: you still choose the scope.
+   each. These are hints, not decisions: you still choose the scope. A Swagger 2.0
+   document is labeled `swagger-2.0` and is converted to OpenAPI 3 before it is
+   compared; see [Swagger 2.0 documents](openapi-compat.md#swagger-20-documents).
 
 2. **Decide the scope of each contract.** For each API a consumer relies on,
    decide the `matchPath` that bounds it. A bundled document can carry several

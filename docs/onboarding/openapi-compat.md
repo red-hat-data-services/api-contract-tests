@@ -63,7 +63,9 @@ spec:
 
 Only paths matching `matchPath` are compared; this is how you scope a check
 to one bounded interface within a larger bundled document instead of
-accidentally gating on every endpoint in the repo. A repository with no
+accidentally gating on every endpoint in the repo. `matchPath` is matched against
+the full URL path: the document's base path plus the path (see
+[Base paths](#base-paths)). A repository with no
 descriptor, or a document with no `contracts:` entry naming it, is never
 checked.
 
@@ -79,6 +81,51 @@ A descriptor can register more than one contract, for example one per API
 version. Give each a stable `id` and its own `matchPath`; the runner and the
 reusable workflow check one contract at a time (`--contract-id`), so call the
 workflow once per contract (see [step 5](#5-add-ci)).
+
+### Base paths
+
+A document serves its `paths` below a base path: the path part of the top-level `servers`
+URLs in OpenAPI 3, or `basePath` in Swagger 2.0. The runner folds that base path into the
+paths before comparing, so `servers: [{url: https://api.example.com/api/v1}]` and the path
+`/widgets` are `/api/v1/widgets` for `matchPath` and in the findings. This has two effects:
+
+- **A changed base path is caught.** oasdiff ignores `servers`, so without this a change that
+  moves every URL would go unnoticed; now it appears as removed paths.
+- **A contract can change dialect.** A Swagger 2.0 document and the equivalent OpenAPI 3
+  document have the same paths, whether the base path is in `servers` or already in the
+  paths.
+
+Server variables are replaced by their defaults. A server URL with only a host, or no
+`servers` at all, has no base path, and the paths are compared as written. If the servers
+have different paths (for example `/api/v1` and `/v1`), there is no single base path and
+the check fails with an error naming them: make the servers agree, or move the difference
+into the paths. Path- and operation-level `servers` are not considered. The report records
+the folded base path in a `canonicalized` block (`base_path_prepended`) for each OpenAPI 3
+document that has one.
+
+### Swagger 2.0 documents
+
+A contract can be a Swagger 2.0 document. Declare it like any other contract (`openapi.static`
+for a committed document, or a bundle adapter). oasdiff reads OpenAPI 3 only, so the runner
+converts a Swagger 2.0 baseline and candidate to OpenAPI 3 before comparing them. An OpenAPI 3
+document is never converted, and a contract can move from Swagger 2.0 to OpenAPI 3 between
+the baseline and the candidate.
+
+- **Build the converter.** It is a small Go program, `cmd/swagger2openapi`, built on the same
+  library family as oasdiff (`kin-openapi`), with the dependency pinned in `go.sum`:
+  `go build -C <path-to-api-contract-tests>/cmd/swagger2openapi -o bin/swagger2openapi .`
+  Pass it with `--swagger2openapi` or `SWAGGER2OPENAPI`. It is needed only when a Swagger 2.0
+  document is compared, and the reusable workflow builds it for you.
+- **`matchPath` matches `basePath` plus the path.** `basePath: /api/v1` and the path `/widgets`
+  are `/api/v1/widgets`, the same as an OpenAPI 3 document with the base path in `servers`
+  (see [Base paths](#base-paths)).
+- **`host` and `schemes` are not compared**, like `servers` in an OpenAPI 3 document.
+- **Documents that are not contracts.** A Swagger 2.0 file with no `paths` (for example the
+  definitions generated for an SDK) is not an API contract: list it in `spec.exclusions`
+  with a reason. A document that refers to a definition it does not contain cannot be
+  converted, and the check fails naming the missing definition.
+- **The report** records `dialect` and a `converted` block (including `base_path_prepended`)
+  for each converted document, and the converter version under `tool_build`.
 
 ### Documents that are not contracts
 
@@ -105,6 +152,9 @@ reads this list.
 GOBIN="$PWD/bin" go install github.com/oasdiff/oasdiff@<version pinned in your descriptor>
 GOBIN="$PWD/bin" go install github.com/mikefarah/yq/v4@<version pinned in your descriptor>
 ```
+
+If a contract is a Swagger 2.0 document, also build the converter (see
+[Swagger 2.0 documents](#swagger-20-documents)).
 
 `checker.py` rejects any other `oasdiff` or `yq` version. For `go install`
 builds that print `main`, it checks the binary's embedded Go module version.
