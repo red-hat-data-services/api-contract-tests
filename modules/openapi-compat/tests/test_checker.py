@@ -303,6 +303,15 @@ class TestOpenAPICompatChecker:
         assert result.returncode == 2
         assert "needs a 'reason'" in result.stderr
 
+    @pytest.mark.parametrize("expression", [".spec.contracts = []", ".spec.contracts = null", "del(.spec.contracts)"])
+    def test_exclusion_only_descriptor_has_nothing_to_check(self, expression):
+        # coverage accepts a descriptor with no contracts; check still needs one to compare.
+        self.set_descriptor(expression)
+        result, report, _ = self.check()
+        assert result.returncode == 2
+        assert report["status"] == "error"
+        assert "Descriptor declares no contracts" in result.stderr
+
     def test_contract_baseline_rejects_mutable_refs(self):
         self.set_descriptor('.spec.contracts[0].baseline = {"refs": ["main"], "reason": "r"}')
         result, _, _ = self.check(refs=[])

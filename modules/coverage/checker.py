@@ -183,9 +183,7 @@ def classify_openapi(
 ) -> tuple[list[Document], list[str], list[str], list[tuple[str, str, str]]]:
     """Account for every discovered document against the descriptor."""
     exclusions = load_exclusions(descriptor)
-    contracts = descriptor.get("spec", {}).get("contracts") or []
-    if not isinstance(contracts, list):
-        raise CheckError("spec.contracts must be a list of contracts")
+    contracts = descriptor_contracts(descriptor)
 
     owners: dict[str, str] = {}
     sources: dict[str, str] = {}
@@ -260,11 +258,11 @@ def baseline_overview(
     reviewers. A baseline that cannot be ordered against the default is flagged too.
     Older or equal baselines are listed without a warning.
     """
-    spec = descriptor.get("spec", {})
+    spec = descriptor.get("spec") or {}
     default = list(default_refs) or ((spec.get("baseline") or {}).get("refs") or [])
     rows: list[Document] = []
     warnings: list[str] = []
-    for contract in spec.get("contracts", []):
+    for contract in descriptor_contracts(descriptor):
         block = contract.get("baseline") if isinstance(contract, dict) else None
         if block is None:
             continue
@@ -514,6 +512,35 @@ def render_coverage(report: Document) -> str:
     return "\n".join(lines)
 
 
+def descriptor_contracts(descriptor: Document) -> list[Any]:
+    """``spec.contracts`` as a list. An empty or omitted list is allowed (an exclusion-only descriptor)."""
+    spec = descriptor.get("spec") or {}
+    contracts = spec.get("contracts") if isinstance(spec, dict) else None
+    if contracts is None:
+        return []
+    if not isinstance(contracts, list):
+        raise CheckError("spec.contracts must be a list of contracts")
+    return contracts
+
+
+def pinned_yq_version(descriptor: Document, requested: str | None) -> str | None:
+    """The one yq version the descriptor's contracts and --yq-version agree on, if any.
+
+    A descriptor with no contracts pins no yq version itself; the reusable workflow passes
+    the version it installed as --yq-version, so the binary is still verified in CI.
+    """
+    versions: set[str] = set()
+    for contract in descriptor_contracts(descriptor):
+        version = (contract.get("policy") or {}).get("yqVersion") if isinstance(contract, dict) else None
+        if version is not None:
+            versions.add(str(version))
+    if len(versions) > 1:
+        raise CheckError(f"Descriptor pins conflicting yq versions: {sorted(versions)}")
+    if requested and versions and requested not in versions:
+        raise CheckError(f"--yq-version {requested} does not match the descriptor's yqVersion {versions.pop()}")
+    return requested or next(iter(versions), None)
+
+
 def run_coverage(args: argparse.Namespace) -> int:
     repo = args.repo.resolve()
     report: Document = {
@@ -527,16 +554,16 @@ def run_coverage(args: argparse.Namespace) -> int:
         if (repo / args.contract_set).is_file():
             yq = openapi.tool_path("yq", args.yq, repo)
             descriptor = openapi.load_descriptor(repo / args.contract_set, yq, repo)
-            versions = {
-                contract.get("policy", {}).get("yqVersion")
-                for contract in descriptor.get("spec", {}).get("contracts", []) if isinstance(contract, dict)
-            } - {None}
-            if len(versions) > 1:
-                raise CheckError(f"Descriptor pins conflicting yq versions: {sorted(versions)}")
-            for version in versions:
+            version = pinned_yq_version(descriptor, getattr(args, "yq_version", None))
+            if version:
                 openapi.verify_yq(yq, version, repo)
+            else:
+                report["warnings"].append(
+                    "No yq version is pinned (no contract declares policy.yqVersion and --yq-version was not "
+                    "given), so the yq binary was not verified")
             rows, problems, warnings, scope = classify_openapi(repo, descriptor, documents)
-            report["openapi"], report["problems"], report["warnings"] = rows, problems, warnings
+            report["openapi"], report["problems"] = rows, problems
+            report["warnings"].extend(warnings)
             report["path_scope"] = [path_scope(yq, repo, *item) for item in scope]
             report["baselines"], baseline_warnings = baseline_overview(repo, descriptor, args.baseline_ref)
             report["warnings"].extend(baseline_warnings)

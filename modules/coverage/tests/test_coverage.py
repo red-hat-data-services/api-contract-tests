@@ -345,6 +345,55 @@ spec:
         assert report["status"] == "gaps"
         assert self.statuses(report)["api/openapi/service.yaml"] == "uncovered"
 
+    EXCLUSION_ONLY = """\
+apiVersion: contracts.rhoai.io/v1alpha1
+kind: ContractSet
+metadata:
+  name: example
+spec:
+{contracts}  exclusions:
+    - path: api/openapi/*
+      reason: SDK definitions generated from the CRDs, not a servable API
+"""
+
+    @pytest.mark.parametrize("contracts", ["  contracts:\n", "  contracts: null\n", ""],
+                             ids=["no-value", "null", "omitted"])
+    def test_exclusion_only_descriptor_without_a_contracts_list_is_complete(self, contracts):
+        # `contracts:` with no value parses as null; it must mean "no contracts", not a crash.
+        self.write(".rhoai/contracts.yaml", self.EXCLUSION_ONLY.format(contracts=contracts))
+        result, report = self.run("coverage", "--yq-version", YQ_VERSION)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["status"] == "complete"
+        assert set(self.statuses(report).values()) == {"excluded"}
+
+    def test_contracts_that_are_not_a_list_are_an_error(self):
+        self.write(".rhoai/contracts.yaml", self.EXCLUSION_ONLY.format(contracts="  contracts: {id: x}\n"))
+        result, report = self.run()
+        assert result.returncode == 2
+        assert "spec.contracts must be a list of contracts" in report["errors"][0]
+
+    def test_exclusion_only_descriptor_verifies_yq_against_yq_version(self):
+        self.write(".rhoai/contracts.yaml", self.EXCLUSION_ONLY.format(contracts="  contracts: []\n"))
+        result, report = self.run("coverage", "--yq-version", YQ_VERSION)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert not any("not verified" in text for text in report["warnings"])
+        result, report = self.run("coverage", "--yq-version", "4.0.0")
+        assert result.returncode == 2
+        assert "Expected yq v4.0.0" in report["errors"][0]
+
+    def test_exclusion_only_descriptor_without_yq_version_warns_that_yq_is_unverified(self):
+        self.write(".rhoai/contracts.yaml", self.EXCLUSION_ONLY.format(contracts="  contracts: []\n"))
+        result, report = self.run()
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert any("yq binary was not verified" in text for text in report["warnings"])
+
+    def test_yq_version_must_match_the_descriptor(self):
+        result, report = self.run("coverage", "--yq-version", "4.0.0")
+        assert result.returncode == 2
+        assert f"does not match the descriptor's yqVersion {YQ_VERSION}" in report["errors"][0]
+        result, report = self.run("coverage", "--yq-version", YQ_VERSION)
+        assert result.returncode == 0, result.stdout + result.stderr
+
     # ---- per-contract baselines -------------------------------------------------------
 
     def commit_all(self, message):

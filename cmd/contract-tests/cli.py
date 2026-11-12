@@ -115,6 +115,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     coverage.add_argument("--report-only", action="store_true",
                           help="Exit 0 even when gaps are found; integrity errors still exit 2")
     coverage.add_argument("--yq", default=os.environ.get("YQ"), help="Repository's pinned yq executable")
+    coverage.add_argument("--yq-version",
+                          help="Exact yq version to verify the binary against; must match the descriptor's "
+                               "yqVersion when contracts declare one. Needed to verify yq when there are no contracts")
 
     discover = subparsers.add_parser(
         "discover", help="Inventory the OpenAPI documents and CRDs in a repository and suggest contract shapes",
