@@ -146,6 +146,13 @@ spec:
 without a `reason` is rejected. The [coverage check](#confirm-nothing-is-left-out)
 reads this list.
 
+When every OpenAPI document in the repository is an exclusion, the
+`contracts` list may be empty: the descriptor then carries only the CRD
+coverage configuration, and coverage still fails on any document that no
+exclusion matches. This is the shape for a repository whose only spec is, for
+example, a `swagger.json` of definitions generated from its CRDs for an SDK —
+no servable API, so no checkable contract, but the CRD checks still apply.
+
 ## 3. Install the pinned tools
 
 ```sh

@@ -183,15 +183,21 @@ def classify_openapi(
 ) -> tuple[list[Document], list[str], list[str], list[tuple[str, str, str]]]:
     """Account for every discovered document against the descriptor."""
     exclusions = load_exclusions(descriptor)
-    contracts = descriptor.get("spec", {}).get("contracts", [])
-    if not isinstance(contracts, list) or not contracts:
-        raise CheckError("Descriptor declares no contracts")
+    contracts = descriptor.get("spec", {}).get("contracts") or []
+    if not isinstance(contracts, list):
+        raise CheckError("spec.contracts must be a list of contracts")
 
     owners: dict[str, str] = {}
     sources: dict[str, str] = {}
     problems: list[str] = []
     warnings: list[str] = []
     scope: list[tuple[str, str, str]] = []
+    if not contracts:
+        # A repository whose OpenAPI documents are all exclusions (for example
+        # SDK definitions generated from CRDs) has a CRD-only contract set.
+        # Safe: any discovered document that no exclusion matches is still
+        # reported as uncovered below.
+        warnings.append("Descriptor declares no OpenAPI contracts; only exclusions apply to OpenAPI documents")
     for contract in contracts:
         contract_id = contract.get("id", "<unnamed>") if isinstance(contract, dict) else "<invalid>"
         if not isinstance(contract, dict):

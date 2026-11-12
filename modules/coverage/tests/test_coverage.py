@@ -299,6 +299,52 @@ spec:
         assert result.returncode == 2
         assert "Descriptor not found" in result.stderr
 
+    def test_no_contract_descriptor_with_all_documents_excluded_is_complete(self):
+        # A repository whose only OpenAPI documents are deliberately not
+        # contracts (for example SDK definitions generated from CRDs) can
+        # still run the CRD coverage checks against an exclusion-only
+        # descriptor instead of having no descriptor at all.
+        self.write(".rhoai/contracts.yaml", """\
+apiVersion: contracts.rhoai.io/v1alpha1
+kind: ContractSet
+metadata:
+  name: example
+spec:
+  contracts: []
+  exclusions:
+    - path: api/openapi/*
+      reason: SDK definitions generated from the CRDs, not a servable API
+""")
+        self.write("config/crd/widgets.yaml", CRD)
+        result, report = self.run("coverage", "--crd-glob", "config/crd/*.yaml")
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["status"] == "complete"
+        assert self.statuses(report) == {
+            "api/openapi/service.yaml": "excluded",
+            "api/openapi/src/service.yaml": "excluded",
+        }
+        assert any("no OpenAPI contracts" in text for text in report["warnings"])
+        assert [row["path"] for row in report["crds"]] == ["config/crd/widgets.yaml"]
+
+    def test_no_contract_descriptor_with_an_unexcluded_document_fails(self):
+        # Emptying the contracts list must not let a document silently escape:
+        # anything no exclusion matches is still uncovered.
+        self.write(".rhoai/contracts.yaml", """\
+apiVersion: contracts.rhoai.io/v1alpha1
+kind: ContractSet
+metadata:
+  name: example
+spec:
+  contracts: []
+  exclusions:
+    - path: api/openapi/src/*
+      reason: generator inputs
+""")
+        result, report = self.run("coverage")
+        assert result.returncode == 1
+        assert report["status"] == "gaps"
+        assert self.statuses(report)["api/openapi/service.yaml"] == "uncovered"
+
     # ---- per-contract baselines -------------------------------------------------------
 
     def commit_all(self, message):
