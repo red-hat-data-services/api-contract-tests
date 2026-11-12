@@ -23,13 +23,14 @@ it used.
 
 Which one to use:
 
-- **Version tag**: the default. One readable string to change when you upgrade,
-  and nothing changes under you between upgrades. Use it for enforced checks,
-  which is the default and recommended mode.
-- **`stable`**: no upgrades to make. Your check can start reporting new findings
-  after a promotion without a change in your repository, which in enforce mode means
-  a pull request can start failing, so prefer a version tag.
-- **`latest`**: for trying a release before it reaches `stable`. Not for gates.
+- **`latest`**: the default, and what the examples use. No upgrades to make: every
+  release reaches your check automatically. A release can start reporting new
+  findings without a change in your repository, which in enforce mode means a pull
+  request can start failing; read the release notes when a release is cut.
+- **Version tag**: when nothing may change under you between upgrades. One readable
+  string to change when you upgrade.
+- **`stable`**: no upgrades to make, but only releases the working group has
+  promoted reach your check.
 - **Full commit SHA**: when you need the strongest guarantee, for example a
   repository that requires SHA pins for every action. Add the release as a comment
   (`@<sha> # v0.1.0`) so readers and update bots can see which release it is.

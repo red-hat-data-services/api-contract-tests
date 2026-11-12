@@ -19,8 +19,8 @@ repository supplies the shared checks and result format.
 - Provider onboarding is opt-in and runs in enforce mode, the default for the
   reusable workflows and the CLI; see
   [`docs/onboarding`](docs/onboarding/README.md). Providers pin the reusable
-  workflows to a release tag (`@v0.1.0`), `@stable`, `@latest` or a full commit
-  SHA; see [releases and pinning](docs/releasing.md). Check each provider
+  workflows to `@latest` (a version tag, `@stable` or a full commit SHA also
+  work); see [releases and pinning](docs/releasing.md). Check each provider
   repository's workflow for whether it has been wired in yet.
 - Consumer onboarding is repository-local today: the consumer owns the reliance
   profile and tests. See the [consumer guide](docs/onboarding/consumer-compat.md).

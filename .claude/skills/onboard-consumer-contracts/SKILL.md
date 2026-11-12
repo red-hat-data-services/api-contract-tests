@@ -178,9 +178,8 @@ profile, the tests, or a provider sync changes. Run it in enforce mode, so a fai
 assertion against the pinned provider baseline fails the job; the drift run against
 provider `main` stays informational and non-blocking. If the workflow calls a reusable
 workflow from `api-contract-tests`, keep `mode: enforce` explicit (it is the default) and
-pin it to a release tag, `stable`, `latest`, or a
-full commit SHA; never a branch. A version tag is the default for an enforced check;
-`@latest` follows the current release automatically and does not suit one.
+pin it to `@latest` (a version tag, `stable`, or a
+full commit SHA also work); never a branch.
 
 Keep the consumer job cluster-free. Do not make a provider pull request run the
 consumer's full end-to-end suite. Upload the test results as an artifact when the

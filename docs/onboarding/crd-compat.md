@@ -18,13 +18,13 @@ signal without a cluster.
 
 ## Add the reusable workflow
 
-Reference the workflow by a release tag, `stable`, `latest` or a full commit SHA
-(see [releases and pinning](../releasing.md)); never by a branch:
+Reference the workflow by `@latest` (a version tag, `stable` or a full commit SHA
+also work; see [releases and pinning](../releasing.md)); never by a branch:
 
 ```yaml
 jobs:
   crd-contract:
-    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-crd-check.yml@v0.1.0
+    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-crd-check.yml@latest
     with:
       crd-glob: config/crd/**/*.yaml
       baseline-refs: <full-git-sha>

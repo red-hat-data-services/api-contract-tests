@@ -248,10 +248,10 @@ request, as a warning in report mode and as an error in enforce mode.
 ## 5. Add CI
 
 Call the reusable workflows from a provider workflow, for example
-`.github/workflows/api-contract.yml`. Reference them by a release tag
-(`@v0.1.0`), by `@stable` or `@latest`, or by a full commit SHA; never by `main`
-or another branch. [Releases and pinning](../releasing.md) explains which to
-choose. Every job runs in `mode: enforce`, the default; keep it explicit as in the
+`.github/workflows/api-contract.yml`. Reference them by `@latest`, as in the
+example below. A version tag, `@stable`, or a full commit SHA also work; never use
+`main` or another branch. [Releases and pinning](../releasing.md) explains the
+choices. Every job runs in `mode: enforce`, the default; keep it explicit as in the
 example below.
 
 ```yaml
@@ -270,7 +270,7 @@ jobs:
       fail-fast: false
       matrix:
         contract-id: [your-service-v1, your-service-v1alpha3]
-    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-openapi-check.yml@v0.1.0
+    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-openapi-check.yml@latest
     with:
       contract-set: .rhoai/contracts.yaml
       contract-id: ${{ matrix.contract-id }}
@@ -280,7 +280,7 @@ jobs:
       mode: enforce
 
   api-contract-coverage:
-    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-coverage-check.yml@v0.1.0
+    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-coverage-check.yml@latest
     with:
       contract-set: .rhoai/contracts.yaml
       baseline-refs: <full-git-sha>   # optional: lets coverage flag per-contract baselines that loosen the default
