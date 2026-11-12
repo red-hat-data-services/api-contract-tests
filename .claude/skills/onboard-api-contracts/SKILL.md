@@ -182,10 +182,9 @@ Create `.github/workflows/api-contract.yml` from the example in
 `contract-id` when there are several contracts) and a coverage job, both `mode: enforce`.
 Set `baseline-refs` to the confirmed baseline SHA, with the source comment described
 in **Baseline SHA**.
-Pin the reusable workflows to the **newest version tag** of `api-contract-tests`
-(`git -C $ACT tag --list 'v*' --sort=-v:refname | head -1`), unless the user asks for
-`stable`, `latest` or a full commit SHA; `$ACT/docs/releasing.md` explains the choices.
-Never pin to a branch. Confirm the release contains `provider-coverage-check.yml` and the
+Pin the reusable workflows to **`@latest`**, unless the user asks for a version tag,
+`stable` or a full commit SHA; `$ACT/docs/releasing.md` explains the choices.
+Never pin to a branch. Confirm the release `latest` points to contains `provider-coverage-check.yml` and the
 per-contract artifact naming before using it. Add the
 CRD job if applicable. Suggest a `CODEOWNERS` entry covering `.rhoai/` and the workflow.
 Put a comment in the workflow naming the pinned release and pointing to `docs/releasing.md` for upgrades.

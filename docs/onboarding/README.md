@@ -68,11 +68,10 @@ repository supplies the runner, schemas, and reusable workflows.
    newer than the default. Fix gaps by registering the document or excluding
    it. Never by deleting the check.
 
-6. **Add the workflow** in `mode: enforce`, pinned to a release of this
-   repository, for example `@v0.1.0`, with `baseline-refs` set to the baseline SHA
-   you chose. See [Adding CI](openapi-compat.md#5-add-ci)
-   and [releases and pinning](../releasing.md) for the choices (version tag,
-   `stable`, `latest` or a full commit SHA).
+6. **Add the workflow** in `mode: enforce`, pinned to `@latest`, with
+   `baseline-refs` set to the baseline SHA you chose. See
+   [Adding CI](openapi-compat.md#5-add-ci) and [releases and pinning](../releasing.md)
+   for the other choices (version tag, `stable` or a full commit SHA).
 
 7. **Protect the configuration.** The descriptor, the workflow, and the
    baseline commit are what keep the check honest. Make them code-owned (for
@@ -112,8 +111,8 @@ repository supplies the runner, schemas, and reusable workflows.
    do not record the name `main` as the baseline.
 
 6. **Add enforce-mode CI.** Run the consumer tests on consumer changes and
-   provider syncs. Pin any reusable workflow to a release tag or full SHA, never
-   a branch. See [consumer CI](consumer-compat.md#6-add-ci-in-enforce-mode).
+   provider syncs. Pin any reusable workflow to `@latest` (or another release
+   tag or full SHA), never a branch. See [consumer CI](consumer-compat.md#6-add-ci-in-enforce-mode).
 
 7. **Register the relationship.** Provide the provider contract, consumer
    profile, test command, CI workflow, owners, support level, and known gaps to

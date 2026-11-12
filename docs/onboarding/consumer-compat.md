@@ -208,11 +208,10 @@ pinned provider baseline fails the job. Enforce is the default for the reusable
 workflows; keep `mode: enforce` explicit as in the example below. The drift job against provider `main` is
 informational by design.
 
-If the job calls a reusable workflow from `api-contract-tests`, pin it to a
-release tag such as `@v0.1.0`, `@stable`, or `@latest`, or to a full commit SHA.
-Never use a branch. [Releases and pinning](../releasing.md) explains the
-trade-offs. A version tag is the default for an enforced check; `@latest` follows the
-current release automatically and does not suit one.
+If the job calls a reusable workflow from `api-contract-tests`, pin it to
+`@latest`, which follows the current release. A version tag, `@stable`, or a full
+commit SHA also work; never use a branch. [Releases and pinning](../releasing.md)
+explains the trade-offs.
 
 This is the shape for a consumer relationship. The Dashboard Model Registry job
 uses the same wiring.
@@ -221,7 +220,7 @@ uses the same wiring.
 jobs:
   openapi:
     name: OpenAPI compatibility vs PR base
-    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-openapi-check.yml@v0.1.0
+    uses: red-hat-data-services/api-contract-tests/.github/workflows/provider-openapi-check.yml@latest
     with:
       contract-set: packages/model-registry/.rhoai/contracts.yaml
       contract-id: model-registry-bff-model-catalog-v1
