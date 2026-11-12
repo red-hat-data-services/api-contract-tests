@@ -95,7 +95,12 @@ input so reviewers can read it.
 
 A repository that ships only CRDs has no descriptor. In that case `coverage`
 runs in CRD-only mode: pass `--crd-glob` and it checks just the CRD globs. If
-the repository also has OpenAPI documents, it needs a descriptor as usual.
+the repository also has OpenAPI documents, it needs a descriptor as usual;
+when none of them is a contract (for example a `swagger.json` of definitions
+generated from the CRDs for an SDK), register each one under
+`spec.exclusions` and leave `spec.contracts` empty — coverage accepts an
+exclusion-only descriptor and still fails on any document no exclusion
+matches.
 
 ## Follow-on work
 
