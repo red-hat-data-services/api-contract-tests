@@ -61,7 +61,7 @@ python3 cmd/contract-tests/cli.py discover --repo /path/to/provider/checkout [--
 
 `coverage` exits 0 when everything is accounted for, 1 when it finds gaps (0 with
 `--report-only`), and 2 on an integrity error such as an unparseable or malformed descriptor
-(both `check` and `coverage` validate its shape the same way),
+(both `check` and `coverage` enforce `schemas/contract-set.schema.json` the same way),
 an exclusion without a reason, or a `yq` that does not match the pinned version.
 The pin is each contract's `policy.yqVersion`, or `--yq-version`, which must agree
 with it; a descriptor with no contracts pins nothing, so pass `--yq-version` (the

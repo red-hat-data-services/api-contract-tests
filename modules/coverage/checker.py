@@ -196,10 +196,7 @@ def classify_openapi(
         # reported as uncovered below.
         warnings.append("Descriptor declares no OpenAPI contracts; only exclusions apply to OpenAPI documents")
     for contract in contracts:
-        contract_id = contract.get("id", "<unnamed>")
-        if contract.get("type") != "openapi":
-            warnings.append(f"contract {contract_id} has type {contract.get('type')!r}; coverage only tracks openapi contracts")
-            continue
+        contract_id = contract["id"]  # validated: a string, and type is 'openapi'
         artifact = contract.get("declaredArtifact")
         if not artifact:
             problems.append(f"contract {contract_id} declares no declaredArtifact")

@@ -9,6 +9,12 @@ the same finding shape.
   verifies it against the committed artifact, and runs a pinned `oasdiff`
   check scoped to the contract's `matchPath`. No provider-specific paths,
   tool versions, or bundling logic live here.
+- **`descriptor.py`** — validates a descriptor against
+  [`schemas/contract-set.schema.json`](../../schemas/contract-set.schema.json) at run time, for both
+  `check` and `coverage`. It interprets the schema itself (the workflows install no Python packages),
+  implements exactly the keywords the schema uses, and refuses to run if the schema gains one it does
+  not implement. `modules/coverage/tests/test_schema.py` checks it agrees with jsonschema on a mutation
+  of every schema property.
 - **`adapters.py`** — the reviewed, registered candidate-generation
   adapters. Candidate generation is inherently provider-specific (every repo
   bundles or generates its spec differently), so this is a small fixed
