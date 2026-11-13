@@ -32,8 +32,10 @@ around a missing adapter.
 
 Create `.rhoai/contracts.yaml` in your repository, validated against
 [`schemas/contract-set.schema.json`](../../schemas/contract-set.schema.json).
-Both `check` and `coverage` reject a descriptor whose blocks have the wrong type before
-doing anything else (exit 2). Writing an optional block such as `candidate:` or
+Both `check` and `coverage` enforce that schema before doing anything else, and reject a
+descriptor that breaks any of its rules (exit 2, with the offending field's path, e.g.
+`spec.contracts[0].policy.flattenAllOf must be a boolean`). They also require `matchPath`
+to be a valid regular expression. Writing an optional block such as `candidate:` or
 `baseline:` with no value counts as the wrong type: omit the key instead. Minimal shape:
 
 ```yaml

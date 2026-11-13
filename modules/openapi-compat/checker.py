@@ -44,6 +44,18 @@ def _load_adapters() -> ModuleType:
 adapters = _load_adapters()
 
 
+def _load_descriptor_schema() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("openapi_compat_descriptor", _HERE / "descriptor.py")
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load {_HERE / 'descriptor.py'}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+descriptor_schema = _load_descriptor_schema()
+
+
 class CheckError(Exception):
     """The comparison could not be completed reliably."""
 
@@ -324,57 +336,19 @@ def load_descriptor(path: Path, yq: Path, cwd: Path) -> Document:
     return data
 
 
-_ABSENT = object()
-
-
-def _optional(mapping: Document, key: str, kind: type, what: str) -> Any:
-    """``mapping[key]`` when present; it must be a ``kind``. An explicit null is not absent."""
-    value = mapping.get(key, _ABSENT)
-    if value is _ABSENT:
-        return None
-    if not isinstance(value, kind):
-        raise CheckError(f"{what} must be a {'mapping' if kind is dict else 'list'}")
-    return value
-
-
 def validate_descriptor(descriptor: Document) -> None:
-    """Check the descriptor's shape once, for every command, as schemas/contract-set.schema.json types it.
+    """Check the descriptor against schemas/contract-set.schema.json, once, for every command.
 
-    Covers what the commands dereference: ``spec``, ``spec.contracts`` and each contract,
-    each contract's ``policy`` (with its pinned tool versions), and the optional
-    ``candidate``, ``baseline``, ``generator``, ``severityOverrides`` and ``exclusions``
-    blocks. An optional block may be omitted, but a present one, including null or another
-    falsy value, must have the schema's type. Semantic rules (full Git SHAs, reasons,
-    registered adapters, exclusion entries) stay with the code that applies them, which
-    gives more specific errors. modules/coverage/tests/test_schema.py keeps this in step
-    with the schema.
+    descriptor.py interprets the schema itself (no jsonschema at run time), so every type,
+    required key, const, enum, pattern, length and conditional rule the schema declares is
+    enforced before a command reads the descriptor, plus one rule stricter than the schema:
+    matchPath must compile as a regular expression. modules/coverage/tests/test_schema.py
+    checks that it agrees with jsonschema on a mutation of every schema property.
     """
-    spec = descriptor.get("spec")
-    if not isinstance(spec, dict):
-        raise CheckError("spec must be a mapping")
-    candidate = _optional(spec, "candidate", dict, "spec.candidate")
-    if candidate is not None:
-        _optional(candidate, "generator", dict, "spec.candidate.generator")
-    _optional(spec, "baseline", dict, "spec.baseline")
-    _optional(spec, "exclusions", list, "spec.exclusions")
-    contracts = spec.get("contracts")
-    if not isinstance(contracts, list):
-        raise CheckError(
-            "spec.contracts is required and must be a list of contracts "
-            "(use `contracts: []` for a descriptor with only exclusions)")
-    for index, contract in enumerate(contracts):
-        if not isinstance(contract, dict):
-            raise CheckError(f"spec.contracts[{index}] must be a mapping")
-        name = f"contract {contract['id']}" if isinstance(contract.get("id"), str) else f"spec.contracts[{index}]"
-        _optional(contract, "generator", dict, f"{name}: generator")
-        _optional(contract, "baseline", dict, f"{name}: baseline")
-        policy = contract.get("policy")
-        if not isinstance(policy, dict):
-            raise CheckError(f"{name}: policy must be a mapping with oasdiffVersion and yqVersion")
-        for pin in ("oasdiffVersion", "yqVersion"):
-            if not isinstance(policy.get(pin), str) or not policy[pin]:
-                raise CheckError(f"{name}: policy.{pin} must be a quoted version string, e.g. \"4.45.1\"")
-        _optional(policy, "severityOverrides", dict, f"{name}: policy.severityOverrides")
+    try:
+        descriptor_schema.validate(descriptor)
+    except descriptor_schema.DescriptorError as error:
+        raise CheckError(str(error)) from error
 
 
 def select_contract(descriptor: Document, contract_id: str | None) -> Document:
@@ -641,7 +615,7 @@ def run_check(args: argparse.Namespace) -> int:
     }
     try:
         code = check_compatibility(args, output, report)
-    except (CheckError, OSError, ValueError) as error:
+    except (CheckError, OSError, ValueError, re.error) as error:
         report["errors"].append(str(error))
         print(str(error), file=sys.stderr)
         code = 2

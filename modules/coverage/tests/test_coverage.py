@@ -185,7 +185,7 @@ class TestCoverage:
         self.descriptor(exclusions="  exclusions:\n    - path: clients/*.yaml\n")
         result, _ = self.run()
         assert result.returncode == 2
-        assert "needs a 'reason'" in result.stderr
+        assert "spec.exclusions[0].reason is required: record why" in result.stderr
 
     def test_stale_exclusion_is_a_warning_not_a_failure(self):
         self.descriptor(exclusions="  exclusions:\n    - path: gone/*.yaml\n      reason: removed long ago\n")
@@ -373,7 +373,8 @@ spec:
         result, report = self.run("coverage", "--yq-version", YQ_VERSION)
         assert result.returncode == 2, result.stdout + result.stderr
         assert report["status"] == "error"
-        assert "spec.contracts is required and must be a list" in report["errors"][0]
+        message = report["errors"][0]
+        assert "spec.contracts is required (use `contracts: []`" in message or "spec.contracts must be a list" in message
 
     @pytest.mark.parametrize("spec", ["spec:\n", "spec: null\n", "spec: []\n", ""],
                              ids=["no-value", "null", "list", "omitted"])
@@ -383,7 +384,7 @@ spec:
         result, report = self.run("coverage", "--yq-version", YQ_VERSION)
         assert result.returncode == 2, result.stdout + result.stderr
         assert report["status"] == "error"
-        assert "spec must be a mapping" in report["errors"][0]
+        assert "spec must be a mapping" in report["errors"][0] or "spec is required" in report["errors"][0]
 
     def edit_descriptor(self, change):
         document = yaml.safe_load((self.repo / ".rhoai/contracts.yaml").read_text(encoding="utf-8"))
@@ -433,12 +434,12 @@ spec:
     @pytest.mark.parametrize("field", ["baseline", "generator"])
     def test_contract_blocks_must_be_mappings(self, field):
         self.edit_descriptor(lambda d: d["spec"]["contracts"][0].update({field: None}))
-        self.assert_invalid(f"contract service-v1: {field} must be a mapping")
+        self.assert_invalid(f"spec.contracts[0].{field} must be a mapping, not null")
 
     @pytest.mark.parametrize("policy", FALSY_OR_WRONG, ids=FALSY_IDS)
     def test_contract_policy_must_be_a_mapping(self, policy):
         self.edit_descriptor(lambda d: d["spec"]["contracts"][0].update(policy=policy))
-        self.assert_invalid("contract service-v1: policy must be a mapping")
+        self.assert_invalid("spec.contracts[0].policy must be a mapping")
 
     def test_every_contract_needs_a_policy_even_when_another_pins_yq(self):
         # The probe from review: one valid pin used to hide a second contract's `policy: null`.
@@ -447,17 +448,42 @@ spec:
             second.pop("generator")
             document["spec"]["contracts"].append(second)
         self.edit_descriptor(add)
-        self.assert_invalid("contract other-v1: policy must be a mapping")
+        self.assert_invalid("spec.contracts[1].policy must be a mapping, not null")
 
     @pytest.mark.parametrize("pin", ["yqVersion", "oasdiffVersion"])
     def test_contract_policy_must_pin_both_tools(self, pin):
         self.edit_descriptor(lambda d: d["spec"]["contracts"][0]["policy"].pop(pin))
-        self.assert_invalid(f"contract service-v1: policy.{pin} must be a quoted version string")
+        self.assert_invalid(f"spec.contracts[0].policy.{pin} is required")
 
     def test_unquoted_yq_version_is_rejected(self):
         # `yqVersion: 4.45` parses as a float; the schema requires a string.
         self.edit_descriptor(lambda d: d["spec"]["contracts"][0]["policy"].update(yqVersion=4.45))
-        self.assert_invalid("contract service-v1: policy.yqVersion must be a quoted version string")
+        self.assert_invalid('spec.contracts[0].policy.yqVersion must be a string, not float 4.45 (quote the version, e.g. "4.45.1")')
+
+    # Review of #16: these used to crash (TypeError, no report) or pass (exit 0).
+    @pytest.mark.parametrize("field, value, message", [
+        ("matchPath", None, "spec.contracts[0].matchPath must be a string, not null"),
+        ("matchPath", 1, "spec.contracts[0].matchPath must be a string, not int 1"),
+        ("matchPath", "[", "matchPath '[' is not a valid regular expression"),
+        ("id", ["a"], "spec.contracts[0].id must be a string, not a list"),
+        ("id", None, "spec.contracts[0].id must be a string, not null"),
+        ("type", "protobuf", "spec.contracts[0].type must be 'openapi'"),
+        ("declaredArtifact", ["x"], "spec.contracts[0].declaredArtifact must be a string, not a list"),
+    ], ids=["matchPath-null", "matchPath-int", "matchPath-regex", "id-list", "id-null", "type-protobuf",
+            "declaredArtifact-list"])
+    def test_contract_fields_are_validated(self, field, value, message):
+        self.edit_descriptor(lambda d: d["spec"]["contracts"][0].update({field: value}))
+        self.assert_invalid(message)
+
+    @pytest.mark.parametrize("field", ["id", "type", "declaredArtifact"])
+    def test_required_contract_fields(self, field):
+        self.edit_descriptor(lambda d: d["spec"]["contracts"][0].pop(field))
+        self.assert_invalid(f"spec.contracts[0].{field} is required")
+
+    @pytest.mark.parametrize("value", [None, "false"], ids=["null", "string"])
+    def test_flatten_all_of_must_be_a_boolean(self, value):
+        self.edit_descriptor(lambda d: d["spec"]["contracts"][0]["policy"].update(flattenAllOf=value))
+        self.assert_invalid("spec.contracts[0].policy.flattenAllOf must be a boolean (true or false)")
 
     def test_contract_entries_must_be_mappings(self):
         self.edit_descriptor(lambda d: d["spec"].update(contracts=["service-v1"]))
@@ -542,7 +568,7 @@ spec:
         sha = self.commit_all("only")
         self.set_baseline([sha], reason=None)
         result, _ = self.run()
-        assert result.returncode == 2 and "needs a 'reason'" in result.stderr
+        assert result.returncode == 2 and "baseline.reason is required: record why" in result.stderr
         self.set_baseline(["main"])
         result, _ = self.run()
         assert result.returncode == 2 and "full 40- or 64-character" in result.stderr

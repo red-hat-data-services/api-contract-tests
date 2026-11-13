@@ -301,12 +301,12 @@ class TestOpenAPICompatChecker:
         self.set_descriptor(f'.spec.contracts[0].baseline = {{"refs": ["{self.baseline}"]}}')
         result, _, _ = self.check(refs=[])
         assert result.returncode == 2
-        assert "needs a 'reason'" in result.stderr
+        assert "spec.contracts[0].baseline.reason is required: record why" in result.stderr
 
     @pytest.mark.parametrize("expression, message", [
         (".spec.contracts = []", "Descriptor declares no contracts"),
-        (".spec.contracts = null", "spec.contracts is required and must be a list"),
-        ("del(.spec.contracts)", "spec.contracts is required and must be a list"),
+        (".spec.contracts = null", "spec.contracts must be a list, not null"),
+        ("del(.spec.contracts)", "spec.contracts is required (use `contracts: []`"),
     ])
     def test_exclusion_only_descriptor_has_nothing_to_check(self, expression, message):
         # coverage accepts `contracts: []`; check still needs a contract to compare.
@@ -333,11 +333,25 @@ class TestOpenAPICompatChecker:
         ('.spec.contracts[0].policy = null', "policy must be a mapping"),
         ('.spec.contracts[0].policy = []', "policy must be a mapping"),
         ('.spec.contracts[0].policy = "strict"', "policy must be a mapping"),
-        ('del(.spec.contracts[0].policy)', "policy must be a mapping"),
-        ('del(.spec.contracts[0].policy.yqVersion)', "policy.yqVersion must be a quoted version string"),
+        ('del(.spec.contracts[0].policy)', "spec.contracts[0].policy is required"),
+        ('del(.spec.contracts[0].policy.yqVersion)', "spec.contracts[0].policy.yqVersion is required"),
         ('.spec.contracts[0].policy.severityOverrides = []', "policy.severityOverrides must be a mapping"),
         ('.spec.contracts[0].generator = null', "generator must be a mapping"),
         ('.spec.contracts[0].baseline = null', "baseline must be a mapping"),
+        # Review of #16: matchPath, flattenAllOf, and the contract's own fields.
+        ('.spec.contracts[0].matchPath = null', "spec.contracts[0].matchPath must be a string, not null"),
+        ('.spec.contracts[0].matchPath = 1', "spec.contracts[0].matchPath must be a string, not int 1"),
+        ('.spec.contracts[0].matchPath = "["', "matchPath '[' is not a valid regular expression"),
+        ('.spec.contracts[0].policy.flattenAllOf = null', "flattenAllOf must be a boolean (true or false), not null"),
+        ('.spec.contracts[0].policy.flattenAllOf = "false"', "flattenAllOf must be a boolean (true or false), not str 'false'"),
+        ('del(.spec.contracts[0].id)', "spec.contracts[0].id is required"),
+        ('.spec.contracts[0].id = ["a"]', "spec.contracts[0].id must be a string, not a list"),
+        ('del(.spec.contracts[0].type)', "spec.contracts[0].type is required"),
+        ('.spec.contracts[0].type = "protobuf"', "spec.contracts[0].type must be 'openapi'"),
+        ('.spec.contracts[0].declaredArtifact = ["x"]', "spec.contracts[0].declaredArtifact must be a string"),
+        ('.spec.contracts[0].policy.severityOverrides.x = "fatal"', "must be one of 'info', 'warn', 'error'"),
+        ('del(.metadata)', "metadata is required"),
+        ('.apiVersion = "v1"', "apiVersion must be 'contracts.rhoai.io/v1alpha1'"),
     ])
     def test_malformed_descriptor_is_a_structured_error(self, expression, message):
         self.set_descriptor(expression)
@@ -346,13 +360,17 @@ class TestOpenAPICompatChecker:
         assert report["status"] == "error"
         assert message in result.stderr
 
-    @pytest.mark.parametrize("expression", [".spec = null", "del(.spec)", ".spec = []"])
-    def test_spec_must_be_a_mapping(self, expression):
+    @pytest.mark.parametrize("expression, message", [
+        (".spec = null", "spec must be a mapping, not null"),
+        ("del(.spec)", "spec is required"),
+        (".spec = []", "spec must be a mapping, not a list"),
+    ])
+    def test_spec_must_be_a_mapping(self, expression, message):
         self.set_descriptor(expression)
         result, report, _ = self.check()
         assert result.returncode == 2
         assert report["status"] == "error"
-        assert "spec must be a mapping" in result.stderr
+        assert message in result.stderr
 
     def test_contract_baseline_rejects_mutable_refs(self):
         self.set_descriptor('.spec.contracts[0].baseline = {"refs": ["main"], "reason": "r"}')
@@ -514,7 +532,8 @@ class TestOpenAPICompatChecker:
         ref = self.git("rev-parse", "HEAD").stdout.strip()
         result, report, _ = self.check(refs=[ref], enforce=False)
         assert result.returncode == 2
-        assert "Unregistered generator adapter" in report["errors"][0]
+        # The schema's adapter enum rejects it before any adapter could run.
+        assert "generator.adapter must be one of" in report["errors"][0]
 
     def test_static_adapter_copies_declared_source_as_candidate(self):
         static_descriptor = DESCRIPTOR.replace(
