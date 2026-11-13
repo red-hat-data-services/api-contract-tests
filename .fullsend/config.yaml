@@ -18,6 +18,19 @@ roles:
     - fix
     - retro
     - prioritize
+agents:
+    - name: code
+      model: gateway/rits/zai-org/glm-5-3
+    - name: fix
+      model: gateway/rits/zai-org/glm-5-3
+    - name: retro
+      model: gateway/rits/zai-org/glm-5-3
+    - name: review
+      model: gateway/rits/zai-org/glm-5-3
+    - name: triage
+      model: gateway/rits/zai-org/glm-5-3
+    - name: prioritize
+      model: gateway/rits/zai-org/glm-5-3
 allowed_remote_resources:
     - https://raw.githubusercontent.com/fullsend-ai/fullsend/
     - https://raw.githubusercontent.com/fullsend-ai/agents/
