@@ -142,6 +142,11 @@ Write `.rhoai/contracts.yaml` following `$ACT/docs/onboarding/openapi-compat.md`
 `oasdiffVersion` and `yqVersion`. Add `severityOverrides` only with a stated reason (for
 example promoting `response-optional-property-removed` to `warn` because a consumer reads an
 optional field). Put every non-contract document under `spec.exclusions` with its reason.
+If that leaves no contracts (for example a CRD-driven operator whose only OpenAPI document is
+a definitions-only `swagger.json` generated from its CRDs for an SDK), write `contracts: []`
+and keep the exclusions: skip the per-contract `check` and the compatibility job, run
+`coverage` with `--yq-version <pinned yq>` and the CRD globs, and add only the CRD and
+coverage jobs. Confirm with the user that no document is a servable API before doing so.
 
 ### 4. Verify locally
 
@@ -166,7 +171,7 @@ mode to get a green run.
 Then:
 
 ```bash
-python3 $ACT/cmd/contract-tests/cli.py coverage --repo <provider> [--crd-glob '<glob>' ...]
+python3 $ACT/cmd/contract-tests/cli.py coverage --repo <provider> --yq-version <yq-version> [--crd-glob '<glob>' ...]
 ```
 
 It must report `Result: complete`. Resolve each `UNCOVERED` document by registering it or

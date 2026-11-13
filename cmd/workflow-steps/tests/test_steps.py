@@ -119,6 +119,13 @@ def test_coverage_args_keep_globs_unexpanded():
     ]
 
 
+def test_coverage_passes_the_installed_yq_version():
+    env = {"MODE": "enforce", "CONTRACT_SET": "c.yaml", "RUNNER_TEMP": "/t", "YQ_VERSION": "4.45.1"}
+    args = steps.check_args("coverage", env, WORKSPACE)
+    assert args[args.index("--yq-version") + 1] == "4.45.1"
+    assert "--yq-version" not in steps.check_args("coverage", dict(env, YQ_VERSION=""), WORKSPACE)
+
+
 def test_coverage_in_enforce_mode_is_not_report_only():
     env = {"MODE": "enforce", "CONTRACT_SET": "c.yaml", "RUNNER_TEMP": "/t"}
     assert "--report-only" not in steps.check_args("coverage", env, WORKSPACE)

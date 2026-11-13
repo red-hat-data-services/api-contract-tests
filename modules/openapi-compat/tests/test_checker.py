@@ -303,6 +303,57 @@ class TestOpenAPICompatChecker:
         assert result.returncode == 2
         assert "needs a 'reason'" in result.stderr
 
+    @pytest.mark.parametrize("expression, message", [
+        (".spec.contracts = []", "Descriptor declares no contracts"),
+        (".spec.contracts = null", "spec.contracts is required and must be a list"),
+        ("del(.spec.contracts)", "spec.contracts is required and must be a list"),
+    ])
+    def test_exclusion_only_descriptor_has_nothing_to_check(self, expression, message):
+        # coverage accepts `contracts: []`; check still needs a contract to compare.
+        self.set_descriptor(expression)
+        result, report, _ = self.check()
+        assert result.returncode == 2
+        assert report["status"] == "error"
+        assert message in result.stderr
+
+    def test_contract_falls_back_to_the_candidate_generator(self):
+        self.set_descriptor(".spec.candidate.generator = .spec.contracts[0].generator | del(.spec.contracts[0].generator)")
+        result, report, _ = self.check()
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["status"] == "compatible"
+
+    # check must turn every malformed shape into a structured report (report.json, exit 2),
+    # through the same validator as coverage; check() asserts report.json exists.
+    @pytest.mark.parametrize("expression, message", [
+        ('.spec.candidate = null', "spec.candidate must be a mapping"),
+        ('.spec.candidate = []', "spec.candidate must be a mapping"),
+        ('.spec.candidate = false', "spec.candidate must be a mapping"),
+        ('.spec.candidate = "openapi.static"', "spec.candidate must be a mapping"),
+        ('.spec.baseline = null', "spec.baseline must be a mapping"),
+        ('.spec.contracts[0].policy = null', "policy must be a mapping"),
+        ('.spec.contracts[0].policy = []', "policy must be a mapping"),
+        ('.spec.contracts[0].policy = "strict"', "policy must be a mapping"),
+        ('del(.spec.contracts[0].policy)', "policy must be a mapping"),
+        ('del(.spec.contracts[0].policy.yqVersion)', "policy.yqVersion must be a quoted version string"),
+        ('.spec.contracts[0].policy.severityOverrides = []', "policy.severityOverrides must be a mapping"),
+        ('.spec.contracts[0].generator = null', "generator must be a mapping"),
+        ('.spec.contracts[0].baseline = null', "baseline must be a mapping"),
+    ])
+    def test_malformed_descriptor_is_a_structured_error(self, expression, message):
+        self.set_descriptor(expression)
+        result, report, _ = self.check()
+        assert result.returncode == 2, result.stdout + result.stderr
+        assert report["status"] == "error"
+        assert message in result.stderr
+
+    @pytest.mark.parametrize("expression", [".spec = null", "del(.spec)", ".spec = []"])
+    def test_spec_must_be_a_mapping(self, expression):
+        self.set_descriptor(expression)
+        result, report, _ = self.check()
+        assert result.returncode == 2
+        assert report["status"] == "error"
+        assert "spec must be a mapping" in result.stderr
+
     def test_contract_baseline_rejects_mutable_refs(self):
         self.set_descriptor('.spec.contracts[0].baseline = {"refs": ["main"], "reason": "r"}')
         result, _, _ = self.check(refs=[])

@@ -53,14 +53,20 @@ python3 cmd/contract-tests/cli.py coverage \
   --repo /path/to/provider/checkout \
   [--contract-set .rhoai/contracts.yaml] [--crd-glob 'config/crd/**/*.yaml'] \
   [--baseline-ref <full-sha>] \
-  [--format text|json] [--report-only] [--yq <path>]
+  [--format text|json] [--report-only] [--yq <path>] [--yq-version <version>]
 
 # Inventory a repository and suggest contract shapes; needs no descriptor.
 python3 cmd/contract-tests/cli.py discover --repo /path/to/provider/checkout [--format text|json]
 ```
 
 `coverage` exits 0 when everything is accounted for, 1 when it finds gaps (0 with
-`--report-only`), and 2 on an integrity error such as an unparseable descriptor,
-an exclusion without a reason, or an unpinned `yq`.
+`--report-only`), and 2 on an integrity error such as an unparseable or malformed descriptor
+(both `check` and `coverage` validate its shape the same way),
+an exclusion without a reason, or a `yq` that does not match the pinned version.
+The pin is each contract's `policy.yqVersion`, or `--yq-version`, which must agree
+with it; a descriptor with no contracts pins nothing, so pass `--yq-version` (the
+reusable workflow does) or coverage fails with an integrity error rather than run an
+unverified `yq`. `spec.contracts` is required; use `contracts: []` for a descriptor
+with only exclusions.
 
 `protobuf-compat` and additional contract types are follow-on work.

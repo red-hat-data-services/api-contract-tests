@@ -32,7 +32,9 @@ around a missing adapter.
 
 Create `.rhoai/contracts.yaml` in your repository, validated against
 [`schemas/contract-set.schema.json`](../../schemas/contract-set.schema.json).
-Minimal shape:
+Both `check` and `coverage` reject a descriptor whose blocks have the wrong type before
+doing anything else (exit 2). Writing an optional block such as `candidate:` or
+`baseline:` with no value counts as the wrong type: omit the key instead. Minimal shape:
 
 ```yaml
 apiVersion: contracts.rhoai.io/v1alpha1
@@ -146,10 +148,15 @@ spec:
 without a `reason` is rejected. The [coverage check](#confirm-nothing-is-left-out)
 reads this list.
 
-When every OpenAPI document in the repository is an exclusion, the
-`contracts` list may be empty: the descriptor then carries only the CRD
-coverage configuration, and coverage still fails on any document that no
-exclusion matches. This is the shape for a repository whose only spec is, for
+When every OpenAPI document in the repository is an exclusion, write
+`contracts: []` (the key is still required; an omitted or blank `contracts` is
+rejected): the descriptor then carries only the exclusions
+(the CRD globs are still the coverage workflow's `crd-globs` input, or
+`--crd-glob` locally), and coverage still fails on any document that no
+exclusion matches. With no contracts, no `yqVersion` is pinned in the
+descriptor; the reusable workflow passes its `yq-version` input to coverage, and
+locally you must pass `--yq-version`, or coverage fails rather than run an
+unverified `yq`. This is the shape for a repository whose only spec is, for
 example, a `swagger.json` of definitions generated from its CRDs for an SDK —
 no servable API, so no checkable contract, but the CRD checks still apply.
 
@@ -227,7 +234,8 @@ and when to use an override.
 
 ```bash
 python3 <path-to-red-hat-data-services/api-contract-tests>/cmd/contract-tests/cli.py coverage \
-  --repo . --contract-set .rhoai/contracts.yaml
+  --repo . --contract-set .rhoai/contracts.yaml \
+  --yq-version 4.45.1   # required with `contracts: []`; otherwise must match policy.yqVersion
 ```
 
 The check finds every OpenAPI document tracked in the repository (plus

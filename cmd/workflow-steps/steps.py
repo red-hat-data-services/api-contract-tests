@@ -8,7 +8,7 @@ environment variables, exactly as the workflow passes them:
     steps.py require-pinned-ref       WORKFLOW_REF, WORKFLOW_SHA, WORKFLOW_REPOSITORY, CALLER_REPOSITORY
     steps.py run {openapi,crd,coverage}
                                       MODE, BASELINE_REFS, and per check: CONTRACT_SET,
-                                      CONTRACT_ID, CRD_GLOB, CRD_GLOBS, CRD_EXCLUDE_GLOBS
+                                      CONTRACT_ID, CRD_GLOB, CRD_GLOBS, CRD_EXCLUDE_GLOBS, YQ_VERSION
     steps.py summarize {openapi,crd}  report at .contract-report/report.json
     steps.py annotate-coverage        MODE, report at $RUNNER_TEMP/coverage.json
 
@@ -150,6 +150,8 @@ def check_args(check: str, env: Mapping[str, str], workspace: Path) -> list[str]
         for glob in env.get("CRD_EXCLUDE_GLOBS", "").split():
             args += ["--crd-exclude", glob]
         args += _baseline_args(env)
+        if env.get("YQ_VERSION"):
+            args += ["--yq-version", env["YQ_VERSION"]]
         if mode == "report":
             args.append("--report-only")
         # The JSON copy stays outside the checkout so it is never scanned as a repository file.

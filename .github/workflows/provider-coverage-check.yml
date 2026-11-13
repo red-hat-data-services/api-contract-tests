@@ -36,7 +36,9 @@ on:
         type: string
         default: enforce
       yq-version:
-        description: Exact mikefarah/yq version declared by the provider descriptor
+        description: >-
+          Exact mikefarah/yq version to install and verify. Must match every contract's
+          policy.yqVersion; it is the only pin for a descriptor with no contracts.
         required: true
         type: string
 
@@ -89,6 +91,7 @@ jobs:
           BASELINE_REFS: ${{ inputs.baseline-refs }}
           MODE: ${{ inputs.mode }}
           YQ: ${{ github.workspace }}/bin/yq
+          YQ_VERSION: ${{ inputs.yq-version }}
         run: python3 .contract-tests/cmd/workflow-steps/steps.py run coverage
 
       - name: Annotate coverage gaps

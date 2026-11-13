@@ -45,7 +45,10 @@ repository supplies the runner, schemas, and reusable workflows.
    APIs (the Model Registry catalog bundle also carries plugin APIs that are
    deliberately out of scope for the Dashboard contract). Documents that are not
    provider contracts, such as an internal UI API, go in `spec.exclusions` with
-   a reason a reviewer can read.
+   a reason a reviewer can read. If no document is a contract (for example a
+   CRD-driven operator whose only OpenAPI document is generated from its CRDs),
+   write `contracts: []` and add only the CRD and coverage jobs; see
+   [documents that are not contracts](openapi-compat.md#documents-that-are-not-contracts).
 
 3. **Write `.rhoai/contracts.yaml`.** See the
    [OpenAPI guide](openapi-compat.md#2-write-a-contractset-descriptor). One
@@ -60,8 +63,13 @@ repository supplies the runner, schemas, and reusable workflows.
 
    ```bash
    python3 cmd/contract-tests/cli.py coverage --repo /path/to/your/repo \
+     --yq-version 4.45.1 \
      --crd-glob 'config/crd/**/*.yaml'      # only if you ship CRDs
    ```
+
+   `--yq-version` is required when the descriptor has `contracts: []`, which pins no
+   `yqVersion`; coverage fails without it. Otherwise it is optional and must match every
+   contract's `policy.yqVersion`.
 
    Every OpenAPI document must be a contract, a generator input, or an
    exclusion with a reason. It also lists per-contract baselines and flags any
