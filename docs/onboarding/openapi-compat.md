@@ -32,7 +32,9 @@ around a missing adapter.
 
 Create `.rhoai/contracts.yaml` in your repository, validated against
 [`schemas/contract-set.schema.json`](../../schemas/contract-set.schema.json).
-Minimal shape:
+Both `check` and `coverage` reject a descriptor whose blocks have the wrong type before
+doing anything else (exit 2). Writing an optional block such as `candidate:` or
+`baseline:` with no value counts as the wrong type: omit the key instead. Minimal shape:
 
 ```yaml
 apiVersion: contracts.rhoai.io/v1alpha1

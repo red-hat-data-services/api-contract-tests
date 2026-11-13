@@ -317,20 +317,75 @@ def load_descriptor(path: Path, yq: Path, cwd: Path) -> Document:
         raise CheckError(f"Cannot parse descriptor {path}: {error}") from error
     if not isinstance(data, dict) or data.get("kind") != "ContractSet":
         raise CheckError(f"{path} is not a ContractSet descriptor (missing kind: ContractSet)")
-    if not isinstance(data.get("spec"), dict):
-        raise CheckError(f"{path}: spec must be a mapping")
+    try:
+        validate_descriptor(data)
+    except CheckError as error:
+        raise CheckError(f"{path}: {error}") from error
     return data
 
 
+_ABSENT = object()
+
+
+def _optional(mapping: Document, key: str, kind: type, what: str) -> Any:
+    """``mapping[key]`` when present; it must be a ``kind``. An explicit null is not absent."""
+    value = mapping.get(key, _ABSENT)
+    if value is _ABSENT:
+        return None
+    if not isinstance(value, kind):
+        raise CheckError(f"{what} must be a {'mapping' if kind is dict else 'list'}")
+    return value
+
+
+def validate_descriptor(descriptor: Document) -> None:
+    """Check the descriptor's shape once, for every command, as schemas/contract-set.schema.json types it.
+
+    Covers what the commands dereference: ``spec``, ``spec.contracts`` and each contract,
+    each contract's ``policy`` (with its pinned tool versions), and the optional
+    ``candidate``, ``baseline``, ``generator``, ``severityOverrides`` and ``exclusions``
+    blocks. An optional block may be omitted, but a present one, including null or another
+    falsy value, must have the schema's type. Semantic rules (full Git SHAs, reasons,
+    registered adapters, exclusion entries) stay with the code that applies them, which
+    gives more specific errors. modules/coverage/tests/test_schema.py keeps this in step
+    with the schema.
+    """
+    spec = descriptor.get("spec")
+    if not isinstance(spec, dict):
+        raise CheckError("spec must be a mapping")
+    candidate = _optional(spec, "candidate", dict, "spec.candidate")
+    if candidate is not None:
+        _optional(candidate, "generator", dict, "spec.candidate.generator")
+    _optional(spec, "baseline", dict, "spec.baseline")
+    _optional(spec, "exclusions", list, "spec.exclusions")
+    contracts = spec.get("contracts")
+    if not isinstance(contracts, list):
+        raise CheckError(
+            "spec.contracts is required and must be a list of contracts "
+            "(use `contracts: []` for a descriptor with only exclusions)")
+    for index, contract in enumerate(contracts):
+        if not isinstance(contract, dict):
+            raise CheckError(f"spec.contracts[{index}] must be a mapping")
+        name = f"contract {contract['id']}" if isinstance(contract.get("id"), str) else f"spec.contracts[{index}]"
+        _optional(contract, "generator", dict, f"{name}: generator")
+        _optional(contract, "baseline", dict, f"{name}: baseline")
+        policy = contract.get("policy")
+        if not isinstance(policy, dict):
+            raise CheckError(f"{name}: policy must be a mapping with oasdiffVersion and yqVersion")
+        for pin in ("oasdiffVersion", "yqVersion"):
+            if not isinstance(policy.get(pin), str) or not policy[pin]:
+                raise CheckError(f"{name}: policy.{pin} must be a quoted version string, e.g. \"4.45.1\"")
+        _optional(policy, "severityOverrides", dict, f"{name}: policy.severityOverrides")
+
+
 def select_contract(descriptor: Document, contract_id: str | None) -> Document:
-    contracts = descriptor.get("spec", {}).get("contracts", [])
-    if not isinstance(contracts, list) or not contracts:
+    contracts = descriptor["spec"]["contracts"]
+    if not contracts:
         raise CheckError("Descriptor declares no contracts")
     if contract_id is None:
         if len(contracts) != 1:
             raise CheckError("Descriptor registers multiple contracts; --contract-id is required")
         return contracts[0]
-    matches = [c for c in contracts if isinstance(c, dict) and c.get("id") == contract_id]
+    matches = [c for c in contracts if c.get("id") == contract_id]
     if len(matches) != 1:
         raise CheckError(f"Contract id {contract_id!r} not found or not unique in descriptor")
     return matches[0]
@@ -349,9 +404,9 @@ def contract_baselines(
     contract_id = contract.get("id")
     block = contract.get("baseline")
     if block is not None:
-        refs = block.get("refs") if isinstance(block, dict) else None
-        reason = block.get("reason") if isinstance(block, dict) else None
-        artifact = block.get("artifact") if isinstance(block, dict) else None
+        refs = block.get("refs")
+        reason = block.get("reason")
+        artifact = block.get("artifact")
         if not isinstance(refs, list) or not refs or any(not isinstance(ref, str) for ref in refs):
             raise CheckError(f"Contract {contract_id!r}: baseline.refs must be a non-empty list of full Git SHAs")
         if not isinstance(reason, str) or not reason.strip():
@@ -364,8 +419,7 @@ def contract_baselines(
         return [(ref, "contract") for ref in refs], artifact, True
     if args.baseline_ref:
         return [(ref, "default") for ref in args.baseline_ref], None, False
-    default = descriptor.get("spec", {}).get("baseline")
-    refs = default.get("refs") if isinstance(default, dict) else None
+    refs = descriptor["spec"].get("baseline", {}).get("refs")
     if isinstance(refs, list) and refs and all(isinstance(ref, str) for ref in refs):
         return [(ref, "default") for ref in refs], None, False
     raise CheckError(
@@ -434,14 +488,11 @@ def check_compatibility(args: argparse.Namespace, output: Path, report: Document
 
     declared_artifact = contract.get("declaredArtifact")
     match_path = contract.get("matchPath", ".*")
-    policy = contract.get("policy", {})
-    oasdiff_version = policy.get("oasdiffVersion")
-    yq_version = policy.get("yqVersion")
-    if not declared_artifact or not oasdiff_version or not yq_version:
-        raise CheckError(
-            f"Contract {contract_id!r} must declare declaredArtifact, "
-            "policy.oasdiffVersion, and policy.yqVersion"
-        )
+    policy = contract["policy"]  # validate_descriptor guarantees both pins
+    oasdiff_version = policy["oasdiffVersion"]
+    yq_version = policy["yqVersion"]
+    if not declared_artifact:
+        raise CheckError(f"Contract {contract_id!r} must declare declaredArtifact")
     severity_overrides = policy.get("severityOverrides", {})
     flatten_allof = policy.get("flattenAllOf", True)
 
@@ -532,10 +583,7 @@ def check_compatibility(args: argparse.Namespace, output: Path, report: Document
         report["baselines"].append(entry)
 
     candidate = output / "candidate.yaml"
-    candidate_defaults = descriptor["spec"].get("candidate") or {}
-    if not isinstance(candidate_defaults, dict):
-        raise CheckError("spec.candidate must be a mapping")
-    generator = contract.get("generator") or candidate_defaults.get("generator")
+    generator = contract.get("generator") or descriptor["spec"].get("candidate", {}).get("generator")
     if not generator or "adapter" not in generator:
         raise CheckError(f"Contract {contract_id!r} has no generator.adapter declared")
     try:

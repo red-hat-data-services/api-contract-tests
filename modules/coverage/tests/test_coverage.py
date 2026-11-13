@@ -390,12 +390,15 @@ spec:
         change(document)
         self.write(".rhoai/contracts.yaml", yaml.safe_dump(document, sort_keys=False))
 
-    def test_blank_candidate_falls_back_to_contract_generators(self):
-        self.edit_descriptor(lambda d: d["spec"].update(candidate=None))
-        result, report = self.run()
-        assert result.returncode == 0, result.stdout + result.stderr
-        assert report["status"] == "complete"
-        assert self.statuses(report)["api/openapi/src/service.yaml"] == "source"
+    def assert_invalid(self, message, *extra):
+        result, report = self.run("coverage", "--yq-version", YQ_VERSION, *extra)
+        assert result.returncode == 2, result.stdout + result.stderr
+        assert report["status"] == "error"
+        assert message in report["errors"][0], report["errors"]
+
+    # Falsy values are the ones an `x or {}` read would silently treat as absent.
+    FALSY_OR_WRONG = [None, [], "", 0, False, "bad"]
+    FALSY_IDS = ["null", "list", "empty-string", "zero", "false", "string"]
 
     def test_contracts_fall_back_to_the_candidate_generator(self):
         # Without a fallback the generator inputs would be reported as uncovered.
@@ -406,42 +409,59 @@ spec:
         assert result.returncode == 0, result.stdout + result.stderr
         assert self.statuses(report)["api/openapi/src/service.yaml"] == "source"
 
-    def test_candidate_must_be_a_mapping(self):
-        self.edit_descriptor(lambda d: d["spec"].update(candidate="openapi.static"))
-        result, report = self.run()
-        assert result.returncode == 2, result.stdout + result.stderr
-        assert "spec.candidate must be a mapping" in report["errors"][0]
+    @pytest.mark.parametrize("candidate", FALSY_OR_WRONG, ids=FALSY_IDS)
+    def test_candidate_must_be_a_mapping(self, candidate):
+        self.edit_descriptor(lambda d: d["spec"].update(candidate=candidate))
+        self.assert_invalid("spec.candidate must be a mapping")
 
-    @pytest.mark.parametrize("exclusions", [None, {"path": "x", "reason": "y"}], ids=["null", "mapping"])
+    def test_candidate_is_validated_without_contracts(self):
+        # With contracts: [] no generator is ever read, so only up-front validation catches this.
+        self.edit_descriptor(lambda d: d["spec"].update(contracts=[], candidate="bad"))
+        self.assert_invalid("spec.candidate must be a mapping")
+
+    @pytest.mark.parametrize("exclusions", [None, {"path": "x", "reason": "y"}, ""], ids=["null", "mapping", "empty-string"])
     def test_exclusions_must_be_a_list(self, exclusions):
         # An omitted exclusions list is fine; a blank one is an error, as the schema says.
         self.edit_descriptor(lambda d: d["spec"].update(exclusions=exclusions))
-        result, report = self.run()
-        assert result.returncode == 2, result.stdout + result.stderr
-        assert report["status"] == "error"
-        assert "spec.exclusions must be a list" in report["errors"][0]
+        self.assert_invalid("spec.exclusions must be a list")
 
-    @pytest.mark.parametrize("baseline", ["main", ["0" * 40]], ids=["string", "list"])
+    @pytest.mark.parametrize("baseline", FALSY_OR_WRONG, ids=FALSY_IDS)
     def test_spec_baseline_must_be_a_mapping(self, baseline):
         self.edit_descriptor(lambda d: d["spec"].update(baseline=baseline))
-        result, report = self.run()
-        assert result.returncode == 2, result.stdout + result.stderr
-        assert report["status"] == "error"
-        assert "spec.baseline must be a mapping" in report["errors"][0]
+        self.assert_invalid("spec.baseline must be a mapping")
 
-    @pytest.mark.parametrize("policy", ["abc", []], ids=["string", "list"])
+    @pytest.mark.parametrize("field", ["baseline", "generator"])
+    def test_contract_blocks_must_be_mappings(self, field):
+        self.edit_descriptor(lambda d: d["spec"]["contracts"][0].update({field: None}))
+        self.assert_invalid(f"contract service-v1: {field} must be a mapping")
+
+    @pytest.mark.parametrize("policy", FALSY_OR_WRONG, ids=FALSY_IDS)
     def test_contract_policy_must_be_a_mapping(self, policy):
         self.edit_descriptor(lambda d: d["spec"]["contracts"][0].update(policy=policy))
-        result, report = self.run("coverage", "--yq-version", YQ_VERSION)
-        assert result.returncode == 2, result.stdout + result.stderr
-        assert report["status"] == "error"
-        assert "contract service-v1: policy must be a mapping" in report["errors"][0]
+        self.assert_invalid("contract service-v1: policy must be a mapping")
 
-    def test_contracts_without_yq_version_ask_for_policy_yq_version(self):
-        self.edit_descriptor(lambda d: d["spec"]["contracts"][0]["policy"].pop("yqVersion"))
-        result, report = self.run()
-        assert result.returncode == 2, result.stdout + result.stderr
-        assert "every contract must declare policy.yqVersion" in report["errors"][0]
+    def test_every_contract_needs_a_policy_even_when_another_pins_yq(self):
+        # The probe from review: one valid pin used to hide a second contract's `policy: null`.
+        def add(document):
+            second = dict(document["spec"]["contracts"][0], id="other-v1", policy=None)
+            second.pop("generator")
+            document["spec"]["contracts"].append(second)
+        self.edit_descriptor(add)
+        self.assert_invalid("contract other-v1: policy must be a mapping")
+
+    @pytest.mark.parametrize("pin", ["yqVersion", "oasdiffVersion"])
+    def test_contract_policy_must_pin_both_tools(self, pin):
+        self.edit_descriptor(lambda d: d["spec"]["contracts"][0]["policy"].pop(pin))
+        self.assert_invalid(f"contract service-v1: policy.{pin} must be a quoted version string")
+
+    def test_unquoted_yq_version_is_rejected(self):
+        # `yqVersion: 4.45` parses as a float; the schema requires a string.
+        self.edit_descriptor(lambda d: d["spec"]["contracts"][0]["policy"].update(yqVersion=4.45))
+        self.assert_invalid("contract service-v1: policy.yqVersion must be a quoted version string")
+
+    def test_contract_entries_must_be_mappings(self):
+        self.edit_descriptor(lambda d: d["spec"].update(contracts=["service-v1"]))
+        self.assert_invalid("spec.contracts[0] must be a mapping")
 
     def test_yq_version_is_verified_before_the_descriptor_is_parsed(self):
         # A descriptor yq cannot parse: with --yq-version, the binary mismatch is reported first.

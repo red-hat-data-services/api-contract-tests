@@ -130,9 +130,7 @@ def normalize(relative: str, what: str) -> str:
 
 
 def load_exclusions(descriptor: Document) -> list[dict[str, str]]:
-    exclusions = descriptor_spec(descriptor).get("exclusions", [])
-    if not isinstance(exclusions, list):
-        raise CheckError("spec.exclusions must be a list of {path, reason} entries")
+    exclusions = descriptor["spec"].get("exclusions", [])  # a list; see openapi.validate_descriptor
     parsed = []
     for index, entry in enumerate(exclusions, start=1):
         if not isinstance(entry, dict) or not isinstance(entry.get("path"), str) or not entry["path"]:
@@ -148,9 +146,7 @@ def load_exclusions(descriptor: Document) -> list[dict[str, str]]:
 
 
 def generator_for(contract: Document, descriptor: Document) -> Document:
-    candidate = descriptor_spec(descriptor).get("candidate") or {}
-    if not isinstance(candidate, dict):
-        raise CheckError("spec.candidate must be a mapping")
+    candidate = descriptor["spec"].get("candidate", {})
     return contract.get("generator") or candidate.get("generator") or {}
 
 
@@ -200,9 +196,7 @@ def classify_openapi(
         # reported as uncovered below.
         warnings.append("Descriptor declares no OpenAPI contracts; only exclusions apply to OpenAPI documents")
     for contract in contracts:
-        contract_id = contract.get("id", "<unnamed>") if isinstance(contract, dict) else "<invalid>"
-        if not isinstance(contract, dict):
-            raise CheckError("Every contract must be a mapping")
+        contract_id = contract.get("id", "<unnamed>")
         if contract.get("type") != "openapi":
             warnings.append(f"contract {contract_id} has type {contract.get('type')!r}; coverage only tracks openapi contracts")
             continue
@@ -261,14 +255,11 @@ def baseline_overview(
     reviewers. A baseline that cannot be ordered against the default is flagged too.
     Older or equal baselines are listed without a warning.
     """
-    spec_baseline = descriptor_spec(descriptor).get("baseline")
-    if spec_baseline is not None and not isinstance(spec_baseline, dict):
-        raise CheckError("spec.baseline must be a mapping with 'refs'")
-    default = list(default_refs) or ((spec_baseline or {}).get("refs") or [])
+    default = list(default_refs) or (descriptor["spec"].get("baseline", {}).get("refs") or [])
     rows: list[Document] = []
     warnings: list[str] = []
     for contract in descriptor_contracts(descriptor):
-        block = contract.get("baseline") if isinstance(contract, dict) else None
+        block = contract.get("baseline")
         if block is None:
             continue
         contract_id = contract.get("id", "<unnamed>")
@@ -517,21 +508,13 @@ def render_coverage(report: Document) -> str:
     return "\n".join(lines)
 
 
-def descriptor_spec(descriptor: Document) -> Document:
-    """``spec`` as a mapping; a missing, blank, or non-mapping ``spec`` is an integrity error."""
-    spec = descriptor.get("spec")
-    if not isinstance(spec, dict):
-        raise CheckError("spec must be a mapping")
-    return spec
+def descriptor_contracts(descriptor: Document) -> list[Document]:
+    """``spec.contracts``; ``[]`` is an exclusion-only descriptor.
 
-
-def descriptor_contracts(descriptor: Document) -> list[Any]:
-    """``spec.contracts`` as a list. It is required; ``[]`` is an exclusion-only descriptor."""
-    contracts = descriptor_spec(descriptor).get("contracts")
-    if not isinstance(contracts, list):
-        raise CheckError(
-            "spec.contracts is required and must be a list of contracts "
-            "(use `contracts: []` for a descriptor with only exclusions)")
+    openapi.load_descriptor has already validated the shape (openapi.validate_descriptor),
+    so this and the other readers here dereference the descriptor without type checks.
+    """
+    contracts: list[Document] = descriptor["spec"]["contracts"]
     return contracts
 
 
@@ -541,18 +524,8 @@ def pinned_yq_version(descriptor: Document, requested: str | None) -> str | None
     A descriptor with no contracts pins no yq version itself, so --yq-version is then
     required; the reusable workflow always passes the version it installed.
     """
-    versions: set[str] = set()
-    for contract in descriptor_contracts(descriptor):
-        if not isinstance(contract, dict):
-            continue  # classify_openapi reports non-mapping contracts
-        policy = contract.get("policy")
-        if policy is None:
-            continue
-        if not isinstance(policy, dict):
-            raise CheckError(f"contract {contract.get('id', '<unnamed>')}: policy must be a mapping")
-        version = policy.get("yqVersion")
-        if version is not None:
-            versions.add(str(version))
+    # validate_descriptor guarantees every contract pins policy.yqVersion as a string.
+    versions = {contract["policy"]["yqVersion"] for contract in descriptor_contracts(descriptor)}
     if len(versions) > 1:
         raise CheckError(f"Descriptor pins conflicting yq versions: {sorted(versions)}")
     if requested and versions and requested not in versions:
@@ -580,9 +553,8 @@ def run_coverage(args: argparse.Namespace) -> int:
             descriptor = openapi.load_descriptor(repo / args.contract_set, yq, repo)
             version = pinned_yq_version(descriptor, requested)
             if not version:
-                # Unpinned tools fail closed (docs/architecture.md).
-                if descriptor_contracts(descriptor):
-                    raise CheckError("No yq version is pinned: every contract must declare policy.yqVersion")
+                # Unpinned tools fail closed (docs/architecture.md). Every contract pins
+                # policy.yqVersion, so only a descriptor with no contracts gets here.
                 raise CheckError(
                     "No yq version is pinned: a descriptor with no contracts pins none, so pass --yq-version")
             if not requested:
