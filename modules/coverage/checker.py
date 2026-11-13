@@ -130,7 +130,9 @@ def normalize(relative: str, what: str) -> str:
 
 
 def load_exclusions(descriptor: Document) -> list[dict[str, str]]:
-    exclusions = descriptor.get("spec", {}).get("exclusions", [])
+    exclusions = descriptor_spec(descriptor).get("exclusions")
+    if exclusions is None:
+        exclusions = []
     if not isinstance(exclusions, list):
         raise CheckError("spec.exclusions must be a list of {path, reason} entries")
     parsed = []
@@ -148,7 +150,10 @@ def load_exclusions(descriptor: Document) -> list[dict[str, str]]:
 
 
 def generator_for(contract: Document, descriptor: Document) -> Document:
-    return contract.get("generator") or descriptor.get("spec", {}).get("candidate", {}).get("generator") or {}
+    candidate = descriptor_spec(descriptor).get("candidate") or {}
+    if not isinstance(candidate, dict):
+        raise CheckError("spec.candidate must be a mapping")
+    return contract.get("generator") or candidate.get("generator") or {}
 
 
 def generator_inputs(repo: Path, generator: Document) -> tuple[set[str], list[str]]:
@@ -258,7 +263,7 @@ def baseline_overview(
     reviewers. A baseline that cannot be ordered against the default is flagged too.
     Older or equal baselines are listed without a warning.
     """
-    spec = descriptor.get("spec") or {}
+    spec = descriptor_spec(descriptor)
     default = list(default_refs) or ((spec.get("baseline") or {}).get("refs") or [])
     rows: list[Document] = []
     warnings: list[str] = []
@@ -512,22 +517,29 @@ def render_coverage(report: Document) -> str:
     return "\n".join(lines)
 
 
+def descriptor_spec(descriptor: Document) -> Document:
+    """``spec`` as a mapping; a missing, blank, or non-mapping ``spec`` is an integrity error."""
+    spec = descriptor.get("spec")
+    if not isinstance(spec, dict):
+        raise CheckError("spec must be a mapping")
+    return spec
+
+
 def descriptor_contracts(descriptor: Document) -> list[Any]:
-    """``spec.contracts`` as a list. An empty or omitted list is allowed (an exclusion-only descriptor)."""
-    spec = descriptor.get("spec") or {}
-    contracts = spec.get("contracts") if isinstance(spec, dict) else None
-    if contracts is None:
-        return []
+    """``spec.contracts`` as a list. It is required; ``[]`` is an exclusion-only descriptor."""
+    contracts = descriptor_spec(descriptor).get("contracts")
     if not isinstance(contracts, list):
-        raise CheckError("spec.contracts must be a list of contracts")
+        raise CheckError(
+            "spec.contracts is required and must be a list of contracts "
+            "(use `contracts: []` for a descriptor with only exclusions)")
     return contracts
 
 
 def pinned_yq_version(descriptor: Document, requested: str | None) -> str | None:
     """The one yq version the descriptor's contracts and --yq-version agree on, if any.
 
-    A descriptor with no contracts pins no yq version itself; the reusable workflow passes
-    the version it installed as --yq-version, so the binary is still verified in CI.
+    A descriptor with no contracts pins no yq version itself, so --yq-version is then
+    required; the reusable workflow always passes the version it installed.
     """
     versions: set[str] = set()
     for contract in descriptor_contracts(descriptor):
@@ -555,12 +567,12 @@ def run_coverage(args: argparse.Namespace) -> int:
             yq = openapi.tool_path("yq", args.yq, repo)
             descriptor = openapi.load_descriptor(repo / args.contract_set, yq, repo)
             version = pinned_yq_version(descriptor, getattr(args, "yq_version", None))
-            if version:
-                openapi.verify_yq(yq, version, repo)
-            else:
-                report["warnings"].append(
-                    "No yq version is pinned (no contract declares policy.yqVersion and --yq-version was not "
-                    "given), so the yq binary was not verified")
+            if not version:
+                # Unpinned tools fail closed (docs/architecture.md). Every contract must pin
+                # policy.yqVersion, so this only happens for a descriptor with no contracts.
+                raise CheckError(
+                    "No yq version is pinned: no contract declares policy.yqVersion, so pass --yq-version")
+            openapi.verify_yq(yq, version, repo)
             rows, problems, warnings, scope = classify_openapi(repo, descriptor, documents)
             report["openapi"], report["problems"] = rows, problems
             report["warnings"].extend(warnings)

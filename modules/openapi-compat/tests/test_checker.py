@@ -312,6 +312,14 @@ class TestOpenAPICompatChecker:
         assert report["status"] == "error"
         assert "Descriptor declares no contracts" in result.stderr
 
+    @pytest.mark.parametrize("expression", [".spec = null", "del(.spec)", ".spec = []"])
+    def test_spec_must_be_a_mapping(self, expression):
+        self.set_descriptor(expression)
+        result, report, _ = self.check()
+        assert result.returncode == 2
+        assert report["status"] == "error"
+        assert "spec must be a mapping" in result.stderr
+
     def test_contract_baseline_rejects_mutable_refs(self):
         self.set_descriptor('.spec.contracts[0].baseline = {"refs": ["main"], "reason": "r"}')
         result, _, _ = self.check(refs=[])

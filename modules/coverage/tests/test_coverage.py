@@ -316,7 +316,7 @@ spec:
       reason: SDK definitions generated from the CRDs, not a servable API
 """)
         self.write("config/crd/widgets.yaml", CRD)
-        result, report = self.run("coverage", "--crd-glob", "config/crd/*.yaml")
+        result, report = self.run("coverage", "--yq-version", YQ_VERSION, "--crd-glob", "config/crd/*.yaml")
         assert result.returncode == 0, result.stdout + result.stderr
         assert report["status"] == "complete"
         assert self.statuses(report) == {
@@ -340,7 +340,7 @@ spec:
     - path: api/openapi/src/*
       reason: generator inputs
 """)
-        result, report = self.run("coverage")
+        result, report = self.run("coverage", "--yq-version", YQ_VERSION)
         assert result.returncode == 1
         assert report["status"] == "gaps"
         assert self.statuses(report)["api/openapi/service.yaml"] == "uncovered"
@@ -356,36 +356,57 @@ spec:
       reason: SDK definitions generated from the CRDs, not a servable API
 """
 
-    @pytest.mark.parametrize("contracts", ["  contracts:\n", "  contracts: null\n", ""],
-                             ids=["no-value", "null", "omitted"])
-    def test_exclusion_only_descriptor_without_a_contracts_list_is_complete(self, contracts):
-        # `contracts:` with no value parses as null; it must mean "no contracts", not a crash.
-        self.write(".rhoai/contracts.yaml", self.EXCLUSION_ONLY.format(contracts=contracts))
+    def test_exclusion_only_descriptor_with_an_empty_contracts_list_is_complete(self):
+        self.write(".rhoai/contracts.yaml", self.EXCLUSION_ONLY.format(contracts="  contracts: []\n"))
         result, report = self.run("coverage", "--yq-version", YQ_VERSION)
         assert result.returncode == 0, result.stdout + result.stderr
         assert report["status"] == "complete"
         assert set(self.statuses(report).values()) == {"excluded"}
 
-    def test_contracts_that_are_not_a_list_are_an_error(self):
-        self.write(".rhoai/contracts.yaml", self.EXCLUSION_ONLY.format(contracts="  contracts: {id: x}\n"))
+    @pytest.mark.parametrize("contracts", ["  contracts:\n", "  contracts: null\n", "", "  contracts: {id: x}\n"],
+                             ids=["no-value", "null", "omitted", "mapping"])
+    def test_contracts_must_be_a_list(self, contracts):
+        # The schema requires spec.contracts as an array; `contracts: []` is the only exclusion-only
+        # shape, so a forgotten key is an integrity error rather than a silent exclusion-only descriptor.
+        self.write(".rhoai/contracts.yaml", self.EXCLUSION_ONLY.format(contracts=contracts))
+        result, report = self.run("coverage", "--yq-version", YQ_VERSION)
+        assert result.returncode == 2, result.stdout + result.stderr
+        assert report["status"] == "error"
+        assert "spec.contracts is required and must be a list" in report["errors"][0]
+
+    @pytest.mark.parametrize("spec", ["spec:\n", "spec: null\n", "spec: []\n", ""],
+                             ids=["no-value", "null", "list", "omitted"])
+    def test_spec_must_be_a_mapping(self, spec):
+        self.write(".rhoai/contracts.yaml",
+                   "apiVersion: contracts.rhoai.io/v1alpha1\nkind: ContractSet\nmetadata:\n  name: example\n" + spec)
+        result, report = self.run("coverage", "--yq-version", YQ_VERSION)
+        assert result.returncode == 2, result.stdout + result.stderr
+        assert report["status"] == "error"
+        assert "spec must be a mapping" in report["errors"][0]
+
+    def test_blank_candidate_falls_back_to_contract_generators(self):
+        text = (self.repo / ".rhoai/contracts.yaml").read_text(encoding="utf-8")
+        self.write(".rhoai/contracts.yaml", text.replace("spec:\n", "spec:\n  candidate:\n", 1))
         result, report = self.run()
-        assert result.returncode == 2
-        assert "spec.contracts must be a list of contracts" in report["errors"][0]
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["status"] == "complete"
 
     def test_exclusion_only_descriptor_verifies_yq_against_yq_version(self):
         self.write(".rhoai/contracts.yaml", self.EXCLUSION_ONLY.format(contracts="  contracts: []\n"))
         result, report = self.run("coverage", "--yq-version", YQ_VERSION)
         assert result.returncode == 0, result.stdout + result.stderr
-        assert not any("not verified" in text for text in report["warnings"])
         result, report = self.run("coverage", "--yq-version", "4.0.0")
         assert result.returncode == 2
         assert "Expected yq v4.0.0" in report["errors"][0]
 
-    def test_exclusion_only_descriptor_without_yq_version_warns_that_yq_is_unverified(self):
+    def test_exclusion_only_descriptor_without_yq_version_fails_closed(self):
+        # Unpinned tools fail closed in both modes (docs/architecture.md).
         self.write(".rhoai/contracts.yaml", self.EXCLUSION_ONLY.format(contracts="  contracts: []\n"))
-        result, report = self.run()
-        assert result.returncode == 0, result.stdout + result.stderr
-        assert any("yq binary was not verified" in text for text in report["warnings"])
+        for extra in ([], ["--report-only"]):
+            result, report = self.run("coverage", *extra)
+            assert result.returncode == 2, result.stdout + result.stderr
+            assert report["status"] == "error"
+            assert "No yq version is pinned" in report["errors"][0]
 
     def test_yq_version_must_match_the_descriptor(self):
         result, report = self.run("coverage", "--yq-version", "4.0.0")

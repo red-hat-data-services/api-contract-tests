@@ -63,8 +63,13 @@ repository supplies the runner, schemas, and reusable workflows.
 
    ```bash
    python3 cmd/contract-tests/cli.py coverage --repo /path/to/your/repo \
+     --yq-version 4.45.1 \
      --crd-glob 'config/crd/**/*.yaml'      # only if you ship CRDs
    ```
+
+   `--yq-version` is required when the descriptor has `contracts: []`, which pins no
+   `yqVersion`; coverage fails without it. Otherwise it is optional and must match every
+   contract's `policy.yqVersion`.
 
    Every OpenAPI document must be a contract, a generator input, or an
    exclusion with a reason. It also lists per-contract baselines and flags any

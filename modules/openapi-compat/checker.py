@@ -317,6 +317,8 @@ def load_descriptor(path: Path, yq: Path, cwd: Path) -> Document:
         raise CheckError(f"Cannot parse descriptor {path}: {error}") from error
     if not isinstance(data, dict) or data.get("kind") != "ContractSet":
         raise CheckError(f"{path} is not a ContractSet descriptor (missing kind: ContractSet)")
+    if not isinstance(data.get("spec"), dict):
+        raise CheckError(f"{path}: spec must be a mapping")
     return data
 
 
@@ -530,7 +532,10 @@ def check_compatibility(args: argparse.Namespace, output: Path, report: Document
         report["baselines"].append(entry)
 
     candidate = output / "candidate.yaml"
-    generator = contract.get("generator") or descriptor.get("spec", {}).get("candidate", {}).get("generator")
+    candidate_defaults = descriptor["spec"].get("candidate") or {}
+    if not isinstance(candidate_defaults, dict):
+        raise CheckError("spec.candidate must be a mapping")
+    generator = contract.get("generator") or candidate_defaults.get("generator")
     if not generator or "adapter" not in generator:
         raise CheckError(f"Contract {contract_id!r} has no generator.adapter declared")
     try:

@@ -171,7 +171,7 @@ mode to get a green run.
 Then:
 
 ```bash
-python3 $ACT/cmd/contract-tests/cli.py coverage --repo <provider> [--crd-glob '<glob>' ...]
+python3 $ACT/cmd/contract-tests/cli.py coverage --repo <provider> --yq-version <yq-version> [--crd-glob '<glob>' ...]
 ```
 
 It must report `Result: complete`. Resolve each `UNCOVERED` document by registering it or

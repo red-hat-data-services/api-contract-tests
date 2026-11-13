@@ -64,6 +64,8 @@ python3 cmd/contract-tests/cli.py discover --repo /path/to/provider/checkout [--
 an exclusion without a reason, or a `yq` that does not match the pinned version.
 The pin is each contract's `policy.yqVersion`, or `--yq-version`, which must agree
 with it; a descriptor with no contracts pins nothing, so pass `--yq-version` (the
-reusable workflow does) or coverage warns that `yq` was not verified.
+reusable workflow does) or coverage fails with an integrity error rather than run an
+unverified `yq`. `spec.contracts` is required; use `contracts: []` for a descriptor
+with only exclusions.
 
 `protobuf-compat` and additional contract types are follow-on work.
