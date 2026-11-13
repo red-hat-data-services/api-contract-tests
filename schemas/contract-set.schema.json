@@ -26,7 +26,7 @@
         },
         "contracts": {
           "type": "array",
-          "description": "May be empty when every OpenAPI document in the repository is an exclusion (a CRD-only contract set); coverage still fails on any document that no exclusion matches.",
+          "description": "Required. Use [] when every OpenAPI document in the repository is an exclusion (a CRD-only contract set); coverage still fails on any document that no exclusion matches, and --yq-version must then be passed because no contract pins yqVersion.",
           "items": { "$ref": "#/$defs/contract" }
         },
         "baseline": {
@@ -121,7 +121,7 @@
           "required": ["oasdiffVersion", "yqVersion"],
           "properties": {
             "oasdiffVersion": { "type": "string", "description": "Exact pinned oasdiff version; verified against the binary's embedded Go module version, not just --version" },
-            "yqVersion": { "type": "string", "description": "Exact pinned mikefarah/yq version; verified before descriptor parsing and candidate generation" },
+            "yqVersion": { "type": "string", "description": "Exact pinned mikefarah/yq version; verified before candidate generation. Reading it means parsing the descriptor first, so coverage, when given --yq-version, verifies the binary before parsing and then checks this pin agrees" },
             "flattenAllOf": { "type": "boolean", "default": true },
             "severityOverrides": {
               "type": "object",

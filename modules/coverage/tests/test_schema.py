@@ -54,6 +54,15 @@ def test_contracts_must_be_a_list(contracts):
     assert errors(yaml.safe_load(EXCLUSION_ONLY.format(contracts=contracts)))
 
 
+@pytest.mark.parametrize("exclusions", ["  exclusions:\n", "  exclusions: null\n", "  exclusions: {path: x, reason: y}\n"],
+                         ids=["no-value", "null", "mapping"])
+def test_exclusions_must_be_a_list(exclusions):
+    # Mirrors modules/coverage/checker.py:load_exclusions; an omitted list is valid.
+    head = EXCLUSION_ONLY.split("  exclusions:")[0].format(contracts="  contracts: []\n")
+    assert errors(yaml.safe_load(head + exclusions))
+    assert errors(yaml.safe_load(head)) == []
+
+
 @pytest.mark.parametrize("spec", ["spec:\n", "spec: []\n", ""], ids=["no-value", "list", "omitted"])
 def test_spec_must_be_a_mapping(spec):
     # Mirrors modules/openapi-compat/checker.py:load_descriptor.

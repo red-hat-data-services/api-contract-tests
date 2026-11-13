@@ -312,6 +312,21 @@ class TestOpenAPICompatChecker:
         assert report["status"] == "error"
         assert "Descriptor declares no contracts" in result.stderr
 
+    def test_contract_falls_back_to_the_candidate_generator(self):
+        self.set_descriptor(".spec.candidate.generator = .spec.contracts[0].generator | del(.spec.contracts[0].generator)")
+        result, report, _ = self.check()
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert report["status"] == "compatible"
+
+    def test_blank_candidate_is_treated_as_absent(self):
+        self.set_descriptor(".spec.candidate = null")
+        result, report, _ = self.check()
+        assert result.returncode == 0, result.stdout + result.stderr
+        self.set_descriptor('.spec.candidate = "openapi.static"')
+        result, report, _ = self.check()
+        assert result.returncode == 2
+        assert "spec.candidate must be a mapping" in result.stderr
+
     @pytest.mark.parametrize("expression", [".spec = null", "del(.spec)", ".spec = []"])
     def test_spec_must_be_a_mapping(self, expression):
         self.set_descriptor(expression)

@@ -130,9 +130,7 @@ def normalize(relative: str, what: str) -> str:
 
 
 def load_exclusions(descriptor: Document) -> list[dict[str, str]]:
-    exclusions = descriptor_spec(descriptor).get("exclusions")
-    if exclusions is None:
-        exclusions = []
+    exclusions = descriptor_spec(descriptor).get("exclusions", [])
     if not isinstance(exclusions, list):
         raise CheckError("spec.exclusions must be a list of {path, reason} entries")
     parsed = []
@@ -263,8 +261,10 @@ def baseline_overview(
     reviewers. A baseline that cannot be ordered against the default is flagged too.
     Older or equal baselines are listed without a warning.
     """
-    spec = descriptor_spec(descriptor)
-    default = list(default_refs) or ((spec.get("baseline") or {}).get("refs") or [])
+    spec_baseline = descriptor_spec(descriptor).get("baseline")
+    if spec_baseline is not None and not isinstance(spec_baseline, dict):
+        raise CheckError("spec.baseline must be a mapping with 'refs'")
+    default = list(default_refs) or ((spec_baseline or {}).get("refs") or [])
     rows: list[Document] = []
     warnings: list[str] = []
     for contract in descriptor_contracts(descriptor):
@@ -543,7 +543,14 @@ def pinned_yq_version(descriptor: Document, requested: str | None) -> str | None
     """
     versions: set[str] = set()
     for contract in descriptor_contracts(descriptor):
-        version = (contract.get("policy") or {}).get("yqVersion") if isinstance(contract, dict) else None
+        if not isinstance(contract, dict):
+            continue  # classify_openapi reports non-mapping contracts
+        policy = contract.get("policy")
+        if policy is None:
+            continue
+        if not isinstance(policy, dict):
+            raise CheckError(f"contract {contract.get('id', '<unnamed>')}: policy must be a mapping")
+        version = policy.get("yqVersion")
         if version is not None:
             versions.add(str(version))
     if len(versions) > 1:
@@ -565,14 +572,21 @@ def run_coverage(args: argparse.Namespace) -> int:
         documents, crds = discover_documents(repo)
         if (repo / args.contract_set).is_file():
             yq = openapi.tool_path("yq", args.yq, repo)
+            requested = getattr(args, "yq_version", None)
+            if requested:
+                # Verify before yq parses the descriptor, as the schema promises. The reusable
+                # workflow always passes --yq-version, so CI never parses with an unverified yq.
+                openapi.verify_yq(yq, requested, repo)
             descriptor = openapi.load_descriptor(repo / args.contract_set, yq, repo)
-            version = pinned_yq_version(descriptor, getattr(args, "yq_version", None))
+            version = pinned_yq_version(descriptor, requested)
             if not version:
-                # Unpinned tools fail closed (docs/architecture.md). Every contract must pin
-                # policy.yqVersion, so this only happens for a descriptor with no contracts.
+                # Unpinned tools fail closed (docs/architecture.md).
+                if descriptor_contracts(descriptor):
+                    raise CheckError("No yq version is pinned: every contract must declare policy.yqVersion")
                 raise CheckError(
-                    "No yq version is pinned: no contract declares policy.yqVersion, so pass --yq-version")
-            openapi.verify_yq(yq, version, repo)
+                    "No yq version is pinned: a descriptor with no contracts pins none, so pass --yq-version")
+            if not requested:
+                openapi.verify_yq(yq, version, repo)
             rows, problems, warnings, scope = classify_openapi(repo, descriptor, documents)
             report["openapi"], report["problems"] = rows, problems
             report["warnings"].extend(warnings)

@@ -47,7 +47,7 @@ repository supplies the runner, schemas, and reusable workflows.
    provider contracts, such as an internal UI API, go in `spec.exclusions` with
    a reason a reviewer can read. If no document is a contract (for example a
    CRD-driven operator whose only OpenAPI document is generated from its CRDs),
-   leave `contracts` empty and add only the CRD and coverage jobs; see
+   write `contracts: []` and add only the CRD and coverage jobs; see
    [documents that are not contracts](openapi-compat.md#documents-that-are-not-contracts).
 
 3. **Write `.rhoai/contracts.yaml`.** See the
