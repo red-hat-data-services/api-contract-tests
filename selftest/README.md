@@ -12,6 +12,9 @@ own pull request instead of first running when a provider bumps its pin.
 | `openapi/gadgets.swagger.json` | OpenAPI check of a Swagger 2.0 contract (converted to OpenAPI 3 first) |
 | `crd/widgets.yaml` | CRD and coverage checks |
 
+The widgets response includes an ECMAScript lookahead pattern, exercising the
+OpenAPI validator fallback in the reusable workflow.
+
 Each check compares against the pull request's base commit (or the previous
 `main` commit on push), so the self-test fails if a pull request makes a breaking
 change to these fixtures. Change them only in compatible ways, or update the
