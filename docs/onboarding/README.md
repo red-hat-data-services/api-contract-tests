@@ -6,6 +6,7 @@ repository owns:
 | Your role | What you own | Start here |
 |---|---|---|
 | Provider | The canonical OpenAPI document or CRDs, provider behavior tests, and the `ContractSet` descriptor | [Provider checklist](#provider-checklist), then the [OpenAPI](openapi-compat.md) or [CRD](crd-compat.md) guide |
+| Provider (installs via manifests) | The rendered Kubernetes installation sources (raw YAML, Helm chart, Kustomize overlay) and the `ManifestSet` descriptor | [Provider checklist](#provider-checklist), then the [manifest](manifest-compat.md) guide |
 | Consumer | The reliance profile, consumer-side contract tests, and the CI job that runs them | [Consumer guide](consumer-compat.md) and [Consumer checklist](#consumer-checklist) |
 
 Provider rollout is opt-in: nothing here is a promotion gate, and every check runs
@@ -19,8 +20,10 @@ will adopt.
 | Piece | Where it lives in your repository | Purpose |
 |---|---|---|
 | `ContractSet` descriptor | `.rhoai/contracts.yaml` | Names each API contract, how its candidate is generated, and the compatibility policy |
+| `ManifestSet` descriptor | `.rhoai/manifests.yaml` | Names each rendered installation scenario (raw/Helm/Kustomize) and its target Kubernetes version |
 | Compatibility workflow | `.github/workflows/api-contract.yml` | Runs the OpenAPI (and CRD) checks on pull requests against a pinned baseline commit |
-| Coverage check | same workflow | Fails (once enforced) when an OpenAPI document or CRD exists that the descriptor does not account for |
+| Manifest workflow | same workflow | Runs the manifest check on pull requests, offline, with pinned go-run renderers |
+| Coverage check | same workflow | Fails (once enforced) when an OpenAPI document or CRD exists that the descriptor does not account for. It inventories OpenAPI documents and CRDs only: it cannot tell that a Helm chart or Kustomize overlay is missing from the `ManifestSet`, so manifest completeness stays a descriptor-review responsibility |
 
 Your repository keeps its canonical OpenAPI documents and CRDs. This
 repository supplies the runner, schemas, and reusable workflows.
@@ -57,7 +60,9 @@ repository supplies the runner, schemas, and reusable workflows.
 4. **Run the checks locally** with the pinned tools, in enforce mode (the default), and the baseline
    you chose in [Choosing a baseline](#choosing-a-baseline):
    [OpenAPI](openapi-compat.md#4-run-it-locally) and, if you ship CRDs,
-   [CRD](crd-compat.md#run-locally).
+   [CRD](crd-compat.md#run-locally). If you install through raw manifests,
+   Helm, or Kustomize, also run the
+   [manifest check](manifest-compat.md#4-run-the-check-locally-offline).
 
 5. **Confirm nothing is left out:**
 
@@ -74,7 +79,13 @@ repository supplies the runner, schemas, and reusable workflows.
    Every OpenAPI document must be a contract, a generator input, or an
    exclusion with a reason. It also lists per-contract baselines and flags any
    newer than the default. Fix gaps by registering the document or excluding
-   it. Never by deleting the check.
+   it. Never by deleting the check. This inventory covers OpenAPI documents
+   and CRDs; it does not verify `ManifestSet` completeness, and passing it
+   does not certify that every chart or overlay your repository installs is
+   checked by the manifest job. Manifest discovery — identifying installation
+   roots versus bases, dependencies, and examples, and mapping them to
+   scenarios with intentional exclusions — is follow-on work; until it exists,
+   scenario completeness is a descriptor-review responsibility.
 
 6. **Add the workflow** in `mode: enforce`, pinned to `@latest`, with
    `baseline-refs` set to the baseline SHA you chose. See
@@ -190,6 +201,20 @@ baseline under a different name (a move or rename; the error names the old file)
 With a catch-all `matchPath` the check cannot tell a rename from a new API, so it
 fails closed whenever another OpenAPI document exists at the baseline.
 
+**Manifest scenarios.** The manifest check applies the same full-SHA and
+multiple-baseline discipline, but stricter absence handling: scenario inputs
+that do not exist at a baseline fail closed until you either declare them in
+a `baselineCases` entry — `state: new` with a verified reason, or
+`state: existing` with the historical input locations for a move — or
+authorize the exact baseline SHA for absence with the reusable workflow's
+`allow-missing-baseline-refs` input (the CLI's repeatable
+`--allow-missing-baseline`). The opt-in is SHA-scoped and event-friendly:
+a moving baseline such as the pull-request base or the previous push can be
+authorized without descriptor edits, an authorized baseline whose inputs are
+only partially present still fails, and an authorized baseline whose inputs
+are present compares normally. See
+[baselines in the manifest guide](manifest-compat.md#5-baselines-compared-moved-and-new).
+
 **Per-contract baselines.** The repository default applies to every contract. To
 give one contract its own baseline, for example to scope an intentional break to a
 single API without moving everyone else's baseline, add a `baseline` block to that
@@ -217,14 +242,15 @@ coverage workflow (and use a full checkout) so this works in CI.
 
 Every job runs in `mode: enforce`: a pull request that breaks a registered contract
 fails the job, on the compatibility job and on the coverage job. Enforce is the default
-for the OpenAPI, CRD, and coverage workflows and for the CLI (`check`, `crd-check`,
-and `coverage`). Report mode (`mode: report`, or `--report-only` on the command line)
-records findings without failing and is not recommended.
+for the OpenAPI, CRD, coverage, and manifest workflows and for the CLI (`check`,
+`crd-check`, `coverage`, and `manifest-check`). Report mode (`mode: report`, or
+`--report-only` on the command line) records findings without failing and is not
+recommended.
 
 The examples still set `mode: enforce` explicitly. Keep it: it documents the intent
 in your workflow, and releases up to and including `v1.0.0` defaulted `mode` to
-`report`, so a caller pinned to one of them that omits `mode` gets a job that stays
-green on a breaking change.
+`report` (the manifest workflow up to and including `v1.1.0`), so a caller pinned
+to one of them that omits `mode` gets a job that stays green on a breaking change.
 
 If the first run fails because the repository already broke its baseline, that is a
 finding, not a reason to use report mode. Fix the break or, for an OpenAPI contract

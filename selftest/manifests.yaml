@@ -1,0 +1,40 @@
+# Manifest self-test fixture: exercises all three renderers (raw YAML, Helm
+# with a vendored local dependency and selected values, Kustomize with a
+# generated ConfigMap reference) against the three audited Kubernetes minors.
+#
+# Event baselines that predate these fixtures are handled without descriptor
+# declarations: the self-test workflow passes its exact event baseline SHA to
+# the reusable workflow's allow-missing-baseline-refs input, so a baseline
+# whose selected inputs are wholly absent is classified new, a baseline that
+# contains the fixtures compares normally, and partial absence still fails.
+apiVersion: contracts.rhoai.io/v1alpha1
+kind: ManifestSet
+metadata:
+  name: selftest
+spec:
+  tools:
+    helmVersion: "4.3.1"
+    kustomizeVersion: "5.8.3"
+  scenarios:
+    - id: raw-app
+      renderer: raw
+      namespace: default
+      kubernetesVersion: 1.37.2
+      sources:
+        - selftest/manifests/raw/*.yaml
+    - id: helm-app
+      renderer: helm
+      namespace: default
+      kubernetesVersion: 1.36.6
+      path: selftest/manifests/helm/app
+      releaseName: selftest
+      valuesFiles:
+        - selftest/manifests/helm/values-selftest.yaml
+      setValues:
+        replicaCount: "3"
+      releaseMode: upgrade
+    - id: kustomize-app
+      renderer: kustomize
+      namespace: selftest
+      kubernetesVersion: 1.35.10
+      path: selftest/manifests/kustomize/overlay

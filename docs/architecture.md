@@ -23,7 +23,7 @@ provider contracts.
 3. Require rolling and supported-release baselines as full Git SHAs. A baseline defines what is released: an API that does not exist at the default baseline is new and not compared, while a contract's own baseline is explicit and must contain it. The onboarding checklist recommends the commit the RHOAI 3.6 release was based on as a repository's default baseline, or the SHA that `main` resolves to when there is none (see [Choosing a baseline](onboarding/README.md#choosing-a-baseline)).
 4. Verify baseline artifact digests.
 5. Run the compatibility check and consumer-profile verification.
-6. Confirm the descriptor accounts for every OpenAPI document and CRD in the repository (the coverage check), so a new spec cannot stay outside the gate unnoticed.
+6. Confirm the descriptor accounts for every OpenAPI document and CRD in the repository (the coverage check), so a new spec cannot stay outside the gate unnoticed. This inventory covers OpenAPI documents and CRDs only: it does not verify ManifestSet completeness, and passing it does not certify that every Helm chart or Kustomize overlay is checked by the manifest compatibility gate.
 7. Publish a machine-readable report with candidate, baseline, policy, and tool provenance.
 8. Advance the rolling baseline only after merge through a trusted workflow.
 
@@ -44,6 +44,13 @@ unpinned tools, and missing required results must not produce a silent pass.
 
 - OpenAPI compatibility is implemented, for OpenAPI 3 and Swagger 2.0 documents (the latter are converted to OpenAPI 3 first).
 - Static CRD compatibility is implemented.
+- Static Kubernetes manifest compatibility is implemented: rendered
+  raw/Helm/Kustomize scenarios compared against full-SHA Git baselines, with
+  immutable-field and relationship rules source-audited against Kubernetes
+  1.35–1.37. Scenarios are declared manually in the ManifestSet descriptor;
+  manifest discovery (identifying installation roots versus bases,
+  dependencies, and examples, and mapping them to scenarios) is deferred
+  follow-on work. Custom resources stay the CRD check's responsibility.
 - CRD conversion, stored-object migration, and consumer-reliance checks are follow-on work.
 - Protobuf and additional contract types are follow-on work.
 

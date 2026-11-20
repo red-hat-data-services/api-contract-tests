@@ -283,6 +283,45 @@ spec:
         assert {row["path"]: row["status"] for row in report["crds"]}["testdata/mock.yaml"] == "excluded"
         assert any("'gone/*'" in text for text in report["warnings"])
 
+    def test_renderer_fixture_crd_accounting_does_not_depend_on_malformed_shape(self):
+        # A kustomize patch that merely says kind: CustomResourceDefinition
+        # (no spec.group/spec.names) is not a discoverable CRD, so it never
+        # demands coverage; fixture accounting must not rely on that hiding.
+        self.write("config/crd/widgets.yaml", CRD)
+        self.write("config/patches/conversion-patch.yaml",
+                   "apiVersion: apiextensions.k8s.io/v1\n"
+                   "kind: CustomResourceDefinition\n"
+                   "metadata:\n  name: widgets.example.io\n"
+                   "spec:\n  conversion:\n    strategy: None\n")
+        result, report = self.run("coverage", "--crd-glob", "config/crd/*.yaml")
+        assert result.returncode == 0, result.stdout
+        assert [row["path"] for row in report["crds"]] == ["config/crd/widgets.yaml"]
+
+        # A well-formed fixture CRD outside the check's globs is discovered
+        # and fails as uncovered until it is excluded explicitly (the
+        # self-test's renderer-fixture accounting); the exclusion is visible
+        # in the report, and an unrelated unregistered CRD still fails.
+        fixture = "modules/manifest-compat/tests/fixtures/renderers/example-crd.yaml"
+        self.write(fixture, CRD.replace("widgets", "examples").replace("Widget", "Example"))
+        result, report = self.run("coverage", "--crd-glob", "config/crd/*.yaml")
+        assert result.returncode == 1
+        crd_statuses = {row["path"]: row["status"] for row in report["crds"]}
+        assert crd_statuses[fixture] == "uncovered"
+
+        result, report = self.run("coverage", "--crd-glob", "config/crd/*.yaml",
+                                  "--crd-exclude", fixture)
+        assert result.returncode == 0, result.stdout
+        crd_statuses = {row["path"]: row["status"] for row in report["crds"]}
+        assert crd_statuses[fixture] == "excluded"
+        assert crd_statuses["config/crd/widgets.yaml"] == "covered"
+
+        self.write("other/unknown.yaml", CRD.replace("widgets", "unknowns").replace("Widget", "Unknown"))
+        result, report = self.run("coverage", "--crd-glob", "config/crd/*.yaml",
+                                  "--crd-exclude", fixture)
+        assert result.returncode == 1
+        crd_statuses = {row["path"]: row["status"] for row in report["crds"]}
+        assert crd_statuses["other/unknown.yaml"] == "uncovered"
+
     def test_crd_only_repository_needs_no_descriptor(self):
         for relative in ("api/openapi/service.yaml", "api/openapi/src/service.yaml", ".rhoai/contracts.yaml"):
             self.git("rm", "-q", "-f", relative)

@@ -39,5 +39,30 @@ jobs:
     with:
       contract-set: selftest/contracts.yaml
       crd-globs: selftest/crd/*.yaml
+      # The kustomize renderer fixture CRD is test data for the manifest
+      # checks, not a served API of this repository: it is discovered by the
+      # repo-wide CRD scan (it is a well-formed CRD) and deliberately excluded
+      # here rather than demanded as covered.
+      crd-exclude-globs: modules/manifest-compat/tests/fixtures/renderers/kustomize/overlays/prod/crds/example-crd.yaml
       mode: enforce
       yq-version: "4.45.1"
+
+  # Each manifest scenario goes through the real reusable workflow with the
+  # real pinned go-run renderers. The baseline ref follows the same PR-base /
+  # previous-push convention as the other self-tests. The event baseline can
+  # predate the selftest fixtures, so it is also passed to the bounded
+  # absent-input authorization: only that exact requested SHA may be
+  # classified new when its inputs are wholly absent, and baselines that
+  # contain the fixtures compare normally without any descriptor declaration.
+  manifest:
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [raw-app, helm-app, kustomize-app]
+    uses: ./.github/workflows/provider-manifest-check.yml
+    with:
+      manifest-set: selftest/manifests.yaml
+      scenario-id: ${{ matrix.scenario }}
+      mode: enforce
+      baseline-refs: ${{ github.event.pull_request.base.sha || github.event.before }}
+      allow-missing-baseline-refs: ${{ github.event.pull_request.base.sha || github.event.before }}

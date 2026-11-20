@@ -26,3 +26,9 @@ spec:
       generator:
         adapter: openapi.static
         source: selftest/openapi/gadgets.swagger.json
+  # Not a served API: a kustomize CRD OpenAPI extension fixture exercised by
+  # the manifest-compat renderer tests; excluded so the repo-wide OpenAPI
+  # document scan does not demand a contract for it.
+  exclusions:
+    - path: modules/manifest-compat/tests/fixtures/renderers/kustomize/overlays/prod/openapi-definition.yaml
+      reason: "kustomize CRD OpenAPI extension fixture for the manifest-compat renderer tests, not a served API"

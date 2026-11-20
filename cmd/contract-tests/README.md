@@ -1,7 +1,8 @@
 # contract-tests local runner
 
 A thin CLI over the [`openapi-compat`](../../modules/openapi-compat/),
-[`crd-compat`](../../modules/crd-compat/), and
+[`crd-compat`](../../modules/crd-compat/),
+[`manifest-compat`](../../modules/manifest-compat/), and
 [`coverage`](../../modules/coverage/) modules.
 
 ```bash
@@ -68,5 +69,39 @@ with it; a descriptor with no contracts pins nothing, so pass `--yq-version` (th
 reusable workflow does) or coverage fails with an integrity error rather than run an
 unverified `yq`. `spec.contracts` is required; use `contracts: []` for a descriptor
 with only exclusions.
+
+Kubernetes manifest checks (see the
+[manifest onboarding guide](../../docs/onboarding/manifest-compat.md)).
+Preparation is the only step that needs the network and needs Go >= 1.27 on
+PATH; the check itself runs the renderers with the module proxy pointed at
+the prepared cache (tool-configuration isolation — there is no OS-enforced
+network sandbox). The check enforces by default; pass `--report-only` to
+record findings without failing:
+
+```bash
+# Once per cache location, with network: fetch and verify the pinned go-run
+# Helm/Kustomize modules. The cache must live outside any repository checkout.
+python3 cmd/contract-tests/cli.py manifest-prepare \
+  --repo /path/to/provider/checkout \
+  --manifest-set .rhoai/manifests.yaml \
+  --tool-cache-dir /tmp/manifest-tools
+
+# On every change. --tool-cache-dir is required only when the
+# selected scenarios render (raw-only selections need no Go).
+python3 cmd/contract-tests/cli.py manifest-check \
+  --repo /path/to/provider/checkout \
+  --manifest-set .rhoai/manifests.yaml \
+  --baseline-ref <full-git-sha> [--baseline-ref <full-git-sha> ...] \
+  [--allow-missing-baseline <full-git-sha> ...] \
+  --output-dir /tmp/manifest-report \
+  [--tool-cache-dir /tmp/manifest-tools] [--scenario-id <id>] [--report-only]
+```
+
+`manifest-check` exits 0 for `compatible` and `new` (and for `breaking`
+findings without `--enforce`), 1 for `breaking` findings with `--enforce`,
+and 2 on integrity errors such as an unresolvable baseline, a render
+failure, or a missing tool cache. Baselines must be full Git SHAs; scenario
+inputs absent at a baseline fail closed until declared in a `baselineCases`
+entry.
 
 `protobuf-compat` and additional contract types are follow-on work.

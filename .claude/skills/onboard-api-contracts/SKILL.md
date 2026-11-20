@@ -1,6 +1,6 @@
 ---
 name: onboard-api-contracts
-description: Onboard a provider repository to the shared API contract checks. Inventories its OpenAPI documents and CRDs, drafts .rhoai/contracts.yaml, runs the compatibility and coverage checks locally, and prepares the enforce-mode CI workflow. Use when asked to onboard, add, or register a repository for API contract testing, or to confirm all of its OpenAPI specs are covered.
+description: Onboard a provider repository to the shared API contract checks. Inventories its OpenAPI documents and CRDs, drafts .rhoai/contracts.yaml, runs the compatibility and coverage checks locally, and prepares the enforce-mode CI workflow. Use when asked to onboard, add, or register a repository for API contract testing (OpenAPI documents and CRDs), or to confirm all of its OpenAPI specs are covered. Not for rendered-manifest (Helm/Kustomize) compatibility onboarding, which follows a separate guide.
 ---
 
 # Onboard a repository to the API contract checks
@@ -9,6 +9,21 @@ You are working in (or pointed at) a **provider repository** and have a checkout
 `red-hat-data-services/api-contract-tests` (call it `$ACT`). The runner is
 `$ACT/cmd/contract-tests/cli.py`. Read `$ACT/docs/onboarding/README.md` first; this skill
 is that checklist as an agent procedure.
+
+## Scope: API contracts only; manifests delegate
+
+This skill onboards **OpenAPI documents and CRDs**. Manifest compatibility (rendered
+Kubernetes manifests from Helm charts or Kustomize overlays) is a separate check:
+
+- A **manifest-only** request does not run this procedure: follow
+  `$ACT/docs/onboarding/manifest-compat.md`, including its own baseline rules.
+- A **mixed** request keeps this procedure for the OpenAPI/CRD portion and
+  delegates the manifest portion to that guide.
+- `discover` and `coverage` inventory OpenAPI documents and CRDs only: they do
+  not find undeclared charts or overlays or prove a ManifestSet is complete.
+- Do not carry this skill's absent-means-new baseline behavior to manifest
+  scenarios; manifest baselines are strict about absent historical inputs, and
+  the guide owns those rules.
 
 Rollout is opt-in, the CI jobs run in **`mode: enforce`** (a pull request that breaks a
 registered contract fails the job; enforce is the default, and the workflow still sets
@@ -204,5 +219,8 @@ and the answers. Offer to commit on a branch; do not open the pull request unles
 
 ## Out of scope
 
-Registering the contract with the working group (step 8 of the checklist) and making
-the job required for merges (branch protection) are owner decisions made later.
+Rendered-manifest (Helm/Kustomize) compatibility onboarding: see
+`$ACT/docs/onboarding/manifest-compat.md`; this skill's `discover`/`coverage`
+inventory does not cover it. Registering the contract with the working group
+(step 8 of the checklist) and making the job required for merges (branch
+protection) are owner decisions made later.
