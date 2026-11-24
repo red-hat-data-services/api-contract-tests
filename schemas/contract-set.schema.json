@@ -120,8 +120,8 @@
           "type": "object",
           "required": ["oasdiffVersion", "yqVersion"],
           "properties": {
-            "oasdiffVersion": { "type": "string", "description": "Exact pinned oasdiff version; verified against the binary's embedded Go module version, not just --version" },
-            "yqVersion": { "type": "string", "description": "Exact pinned mikefarah/yq version; verified before candidate generation. Reading it means parsing the descriptor first, so coverage, when given --yq-version, verifies the binary before parsing and then checks this pin agrees" },
+            "oasdiffVersion": { "type": "string", "minLength": 1, "description": "Exact pinned oasdiff version; verified against the binary's embedded Go module version, not just --version" },
+            "yqVersion": { "type": "string", "minLength": 1, "description": "Exact pinned mikefarah/yq version; verified before candidate generation. Reading it means parsing the descriptor first, so coverage, when given --yq-version, verifies the binary before parsing and then checks this pin agrees" },
             "flattenAllOf": { "type": "boolean", "default": true },
             "severityOverrides": {
               "type": "object",
